@@ -1,25 +1,37 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useState } from "react";
+import { CaptureZone } from "./components/CaptureZone";
+import { ImagePreview } from "./components/ImagePreview";
+import type { CapturedImage } from "./lib/image";
 import "./App.css";
 
-// Temporary P0 sanity check: confirms Vite+React render, Tailwind styles apply,
-// and the Tauri IPC bridge to Rust works. Replaced by the real capture UI in P1.
 function App() {
-  const [bridgeStatus, setBridgeStatus] = useState("checking Rust bridge...");
-
-  useEffect(() => {
-    invoke<string>("greet", { name: "texnap" })
-      .then((msg) => setBridgeStatus(msg))
-      .catch(() => setBridgeStatus("Rust bridge failed"));
-  }, []);
+  const [image, setImage] = useState<CapturedImage | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-neutral-950 text-neutral-100">
-      <h1 className="text-2xl font-semibold">texnap</h1>
-      <p className="text-neutral-400">screenshot / photo → LaTeX</p>
-      <p className="rounded-md bg-neutral-800 px-3 py-1 text-sm text-neutral-300">
-        {bridgeStatus}
-      </p>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-neutral-950 p-8 text-neutral-100">
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-2xl font-semibold">texnap</h1>
+        <p className="text-neutral-400">screenshot / photo → LaTeX</p>
+      </div>
+
+      {error && (
+        <div className="w-full max-w-lg rounded-md border border-red-900 bg-red-950/60 px-3 py-2 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {image ? (
+        <ImagePreview image={image} onClear={() => setImage(null)} />
+      ) : (
+        <CaptureZone
+          onCapture={(captured) => {
+            setError(null);
+            setImage(captured);
+          }}
+          onError={setError}
+        />
+      )}
     </main>
   );
 }
