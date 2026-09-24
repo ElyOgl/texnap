@@ -5,6 +5,8 @@
 
 mod anthropic;
 mod gemini;
+mod openai_compat;
+mod simpletex;
 
 use crate::provider::Provider;
 use std::fmt;
@@ -65,5 +67,12 @@ pub async fn transcribe_to_latex(
     match provider {
         Provider::Anthropic => anthropic::call(image_data_url, api_key).await,
         Provider::Gemini => gemini::call(image_data_url, api_key).await,
+        Provider::SimpleTex => simpletex::call(image_data_url, api_key).await,
+        Provider::OpenRouter => {
+            openai_compat::call(&openai_compat::OPENROUTER, image_data_url, api_key).await
+        }
+        Provider::OpenAi => {
+            openai_compat::call(&openai_compat::OPENAI, image_data_url, api_key).await
+        }
     }
 }

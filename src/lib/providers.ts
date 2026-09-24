@@ -2,6 +2,7 @@ export type ProviderInfo = {
   id: string;
   label: string;
   freeTier: boolean;
+  note: string;
   keyPlaceholder: string;
   getKeyUrl: string;
 };

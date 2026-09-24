@@ -96,6 +96,8 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
         ))}
       </select>
 
+      {info && <p className="text-sm text-neutral-500">{info.note}</p>}
+
       {alreadySaved ? (
         <>
           <p className="text-sm text-neutral-400">
