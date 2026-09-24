@@ -109,11 +109,22 @@ pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrErro
     let parsed: MessagesResponse = serde_json::from_slice(&bytes)
         .map_err(|e| OcrError::UnparseableResponse(e.to_string()))?;
 
-    parsed
+    // Concatenate every text block rather than just the first — same reason as
+    // the Gemini module: a multi-block response would otherwise come back
+    // silently truncated, looking like a successful short answer.
+    let text = parsed
         .content
         .into_iter()
-        .find(|block| block.kind == "text")
-        .and_then(|block| block.text)
-        .map(|text| text.trim().to_string())
-        .ok_or_else(|| OcrError::UnparseableResponse("no text block in response".into()))
+        .filter(|block| block.kind == "text")
+        .filter_map(|block| block.text)
+        .collect::<Vec<_>>()
+        .join("");
+
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        return Err(OcrError::UnparseableResponse(
+            "no text block in response".into(),
+        ));
+    }
+    Ok(text)
 }

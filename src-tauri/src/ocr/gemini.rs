@@ -154,14 +154,20 @@ pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrErro
         .next()
         .ok_or_else(|| OcrError::UnparseableResponse("no candidates in response".into()))?;
 
-    let text = candidate
+    // Concatenate every non-thought part. Gemini does split one answer across
+    // several parts (confirmed 2026-09-24: a formula came back as "...+\infty"
+    // + "[ \text{ tel que }..."), with a perfectly normal STOP finishReason —
+    // so reading only the first part looks like success while silently losing
+    // the rest. Join with NO separator: parts can split mid-expression.
+    let joined = candidate
         .content
         .parts
         .into_iter()
-        .find(|p| !p.thought)
-        .and_then(|p| p.text)
-        .map(|text| text.trim().to_string())
-        .filter(|t| !t.is_empty());
+        .filter(|p| !p.thought)
+        .filter_map(|p| p.text)
+        .collect::<Vec<_>>()
+        .join("");
+    let text = Some(joined.trim().to_string()).filter(|t| !t.is_empty());
 
     match (text, candidate.finish_reason.as_deref()) {
         (Some(text), Some("MAX_TOKENS")) => Err(OcrError::UnparseableResponse(format!(
