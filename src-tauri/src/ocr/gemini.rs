@@ -34,14 +34,40 @@ struct Content {
     parts: Vec<Part>,
 }
 
+// gemini-2.5/3.x Flash think by default, and thinking tokens are billed
+// against maxOutputTokens — a low or unset limit means the model can burn
+// its whole budget "thinking" and get cut off before writing the actual
+// answer (confirmed against real output 2026-09-24: response stopped
+// mid-formula with no error). Transcription doesn't need reasoning, so
+// thinking is disabled outright rather than just raising the token cap.
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ThinkingConfig {
+    thinking_budget: i32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GenerationConfig {
+    thinking_config: ThinkingConfig,
+    max_output_tokens: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct GenerateContentRequest {
     contents: Vec<Content>,
+    generation_config: GenerationConfig,
 }
 
 #[derive(Deserialize)]
 struct ResponsePart {
     text: Option<String>,
+    // Defensive: if a "thought" part ever slips through even with thinking
+    // disabled, skip it rather than returning its (reasoning, not answer)
+    // text as if it were the transcription.
+    #[serde(default)]
+    thought: bool,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +79,8 @@ struct ResponseContent {
 #[derive(Deserialize)]
 struct Candidate {
     content: ResponseContent,
+    #[serde(default, rename = "finishReason")]
+    finish_reason: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -85,6 +113,10 @@ pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrErro
                 },
             ],
         }],
+        generation_config: GenerationConfig {
+            thinking_config: ThinkingConfig { thinking_budget: 0 },
+            max_output_tokens: 4096,
+        },
     };
 
     let client = reqwest::Client::new();
@@ -116,11 +148,29 @@ pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrErro
     let parsed: GenerateContentResponse = serde_json::from_slice(&bytes)
         .map_err(|e| OcrError::UnparseableResponse(e.to_string()))?;
 
-    parsed
+    let candidate = parsed
         .candidates
         .into_iter()
         .next()
-        .and_then(|c| c.content.parts.into_iter().find_map(|p| p.text))
+        .ok_or_else(|| OcrError::UnparseableResponse("no candidates in response".into()))?;
+
+    let text = candidate
+        .content
+        .parts
+        .into_iter()
+        .find(|p| !p.thought)
+        .and_then(|p| p.text)
         .map(|text| text.trim().to_string())
-        .ok_or_else(|| OcrError::UnparseableResponse("no text part in response".into()))
+        .filter(|t| !t.is_empty());
+
+    match (text, candidate.finish_reason.as_deref()) {
+        (Some(text), Some("MAX_TOKENS")) => Err(OcrError::UnparseableResponse(format!(
+            "response was cut off (hit the token limit) even with thinking disabled — got: {text:?}"
+        ))),
+        (Some(text), _) => Ok(text),
+        (None, Some(reason)) => Err(OcrError::UnparseableResponse(format!(
+            "no text in response, finish reason: {reason}"
+        ))),
+        (None, None) => Err(OcrError::UnparseableResponse("no text part in response".into())),
+    }
 }
