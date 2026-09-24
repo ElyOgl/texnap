@@ -50,6 +50,7 @@ npm run tauri build  # produces the .app / .dmg
 - GitHub commits must use `273943543+ElyOgl@users.noreply.github.com` (email privacy is on) — set as both global and local `user.email`.
 - No `bun` on this machine — always `npm`.
 - Rust toolchain installed 2026-09-23 via `rustup` specifically for this project (`~/.cargo/`, stable channel). Xcode Command Line Tools were already present (required by Tauri on macOS).
+- `rustup`'s installer wrote the `cargo` PATH sourcing line to `~/.profile`, which **zsh (this Mac's default shell) never reads.** Symptom: `npm run tauri dev` fails with `failed to run 'cargo metadata' ... No such file or directory` in a normal terminal, even though `cargo` works fine in contexts that explicitly source `~/.cargo/env`. Fixed 2026-09-24 by adding `. "$HOME/.cargo/env"` to `~/.zshrc` directly — a **new** terminal tab is required after that fix (existing tabs keep the old PATH).
 
 ## Working session plan
 
