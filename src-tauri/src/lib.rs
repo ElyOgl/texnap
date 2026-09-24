@@ -1,13 +1,15 @@
 mod capture;
 mod config;
 mod ocr;
+mod provider;
 
 use tauri::AppHandle;
 
 #[tauri::command]
 async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<String, String> {
-    let api_key = config::resolve_api_key(&app).ok_or_else(|| ocr::OcrError::MissingApiKey.to_string())?;
-    ocr::transcribe_to_latex(&image_data_url, &api_key)
+    let (provider, api_key) = config::resolve_active_provider_and_key(&app)
+        .ok_or_else(|| ocr::OcrError::MissingApiKey.to_string())?;
+    ocr::transcribe_to_latex(provider, &image_data_url, &api_key)
         .await
         .map_err(|e| e.to_string())
 }
@@ -24,8 +26,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             capture::read_image_as_base64,
-            config::get_api_key_status,
-            config::save_api_key,
+            config::get_config_status,
+            config::list_providers,
+            config::save_provider_key,
+            config::set_active_provider,
             ocr_transcribe
         ])
         .run(tauri::generate_context!())

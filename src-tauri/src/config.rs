@@ -1,21 +1,23 @@
-//! P2a: where the Anthropic API key comes from. Resolution order:
-//! 1. `ANTHROPIC_API_KEY` env var / repo-root `.env` (dev convenience — `dotenvy::dotenv()`
-//!    is called once at startup in `lib.rs` and searches upward from the CWD, so it finds
-//!    a repo-root `.env` even though `tauri dev` runs `cargo` from `src-tauri/`).
-//! 2. A plain `config.json` in the app's data dir (`~/Library/Application Support/fr.elyo.texnap/`
-//!    on macOS). This is what the built `.dmg` uses — it has no `.env` file.
+//! P2a: which provider is active and where its key comes from. Resolution
+//! order per provider: (1) that provider's env var / repo-root `.env` (dev
+//! convenience — `dotenvy::dotenv()` in `lib.rs` searches upward from the
+//! CWD); (2) `config.json` in the app's data dir (`~/Library/Application
+//! Support/fr.elyo.texnap/` on macOS) — this is what the built `.dmg` uses.
 //!
-//! Deliberately NOT using macOS Keychain: this is a single-user local tool, nothing else
-//! on the machine reads this file, and Keychain integration is real extra plumbing for
-//! marginal benefit here. See `Trinity/TEXNAP/DECISIONS.md` § Deferred.
+//! Deliberately NOT using macOS Keychain: single-user local tool, nothing
+//! else on the machine reads this file. See `Trinity/TEXNAP/DECISIONS.md`.
 
+use crate::provider::{Provider, ProviderInfo};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use tauri::{AppHandle, Manager};
 
 #[derive(Serialize, Deserialize, Default)]
 struct StoredConfig {
-    api_key: Option<String>,
+    provider: Option<String>,
+    #[serde(default)]
+    keys: HashMap<String, String>,
 }
 
 fn config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -27,37 +29,98 @@ fn config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir.join("config.json"))
 }
 
-fn read_stored_key(app: &AppHandle) -> Option<String> {
-    let path = config_path(app).ok()?;
-    let contents = fs::read_to_string(path).ok()?;
-    let config: StoredConfig = serde_json::from_str(&contents).ok()?;
-    config.api_key.filter(|k| !k.trim().is_empty())
+fn read_stored(app: &AppHandle) -> StoredConfig {
+    config_path(app)
+        .ok()
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
 }
 
-/// Used by `ocr.rs` — not exposed as a command itself, so the key never has to
-/// round-trip through JS at all once it's been saved once.
-pub fn resolve_api_key(app: &AppHandle) -> Option<String> {
-    std::env::var("ANTHROPIC_API_KEY")
+fn write_stored(app: &AppHandle, config: &StoredConfig) -> Result<(), String> {
+    let path = config_path(app)?;
+    let json = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| format!("Couldn't write {}: {e}", path.display()))
+}
+
+fn active_provider(stored: &StoredConfig) -> Provider {
+    stored
+        .provider
+        .as_deref()
+        .and_then(Provider::from_str)
+        .unwrap_or(Provider::Gemini) // default to the free one
+}
+
+fn key_for(stored: &StoredConfig, provider: Provider) -> Option<String> {
+    std::env::var(provider.env_var_name())
         .ok()
         .filter(|k| !k.trim().is_empty())
-        .or_else(|| read_stored_key(app))
+        .or_else(|| {
+            stored
+                .keys
+                .get(provider.as_str())
+                .filter(|k| !k.trim().is_empty())
+                .cloned()
+        })
+}
+
+/// Used by the `ocr_transcribe` command — the key never round-trips through
+/// JS beyond the one time it's saved.
+pub fn resolve_active_provider_and_key(app: &AppHandle) -> Option<(Provider, String)> {
+    let stored = read_stored(app);
+    let provider = active_provider(&stored);
+    key_for(&stored, provider).map(|key| (provider, key))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigStatus {
+    pub configured: bool,
+    pub active_provider: &'static str,
+    pub saved_providers: Vec<&'static str>,
 }
 
 #[tauri::command]
-pub fn get_api_key_status(app: AppHandle) -> bool {
-    resolve_api_key(&app).is_some()
+pub fn get_config_status(app: AppHandle) -> ConfigStatus {
+    let stored = read_stored(&app);
+    let provider = active_provider(&stored);
+    ConfigStatus {
+        configured: key_for(&stored, provider).is_some(),
+        active_provider: provider.as_str(),
+        saved_providers: Provider::ALL
+            .iter()
+            .filter(|p| key_for(&stored, **p).is_some())
+            .map(|p| p.as_str())
+            .collect(),
+    }
 }
 
 #[tauri::command]
-pub fn save_api_key(app: AppHandle, key: String) -> Result<(), String> {
+pub fn list_providers() -> Vec<ProviderInfo> {
+    Provider::ALL.iter().map(|p| p.info()).collect()
+}
+
+#[tauri::command]
+pub fn save_provider_key(app: AppHandle, provider: String, key: String) -> Result<(), String> {
+    let provider =
+        Provider::from_str(&provider).ok_or_else(|| format!("Unknown provider \"{provider}\""))?;
     let trimmed = key.trim();
     if trimmed.is_empty() {
         return Err("API key can't be empty".into());
     }
-    let path = config_path(&app)?;
-    let config = StoredConfig {
-        api_key: Some(trimmed.to_string()),
-    };
-    let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
-    fs::write(&path, json).map_err(|e| format!("Couldn't write {}: {e}", path.display()))
+    let mut stored = read_stored(&app);
+    stored
+        .keys
+        .insert(provider.as_str().to_string(), trimmed.to_string());
+    stored.provider = Some(provider.as_str().to_string());
+    write_stored(&app, &stored)
+}
+
+#[tauri::command]
+pub fn set_active_provider(app: AppHandle, provider: String) -> Result<(), String> {
+    let provider =
+        Provider::from_str(&provider).ok_or_else(|| format!("Unknown provider \"{provider}\""))?;
+    let mut stored = read_stored(&app);
+    stored.provider = Some(provider.as_str().to_string());
+    write_stored(&app, &stored)
 }

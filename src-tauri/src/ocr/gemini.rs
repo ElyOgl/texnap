@@ -1,0 +1,120 @@
+use super::{parse_data_url, OcrError, PROMPT};
+use serde::{Deserialize, Serialize};
+
+const MODEL: &str = "gemini-2.5-flash";
+
+fn api_url() -> String {
+    format!("https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent")
+}
+
+#[derive(Serialize)]
+struct InlineData {
+    mime_type: String,
+    data: String,
+}
+
+// Untagged so each variant serializes as its single field directly —
+// {"inline_data": {...}} or {"text": "..."} — matching what the Gemini API
+// expects, instead of being wrapped in an extra variant-name key.
+#[derive(Serialize)]
+#[serde(untagged)]
+enum Part {
+    InlineData { inline_data: InlineData },
+    Text { text: String },
+}
+
+#[derive(Serialize)]
+struct Content {
+    parts: Vec<Part>,
+}
+
+#[derive(Serialize)]
+struct GenerateContentRequest {
+    contents: Vec<Content>,
+}
+
+#[derive(Deserialize)]
+struct ResponsePart {
+    text: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ResponseContent {
+    #[serde(default)]
+    parts: Vec<ResponsePart>,
+}
+
+#[derive(Deserialize)]
+struct Candidate {
+    content: ResponseContent,
+}
+
+#[derive(Deserialize)]
+struct GenerateContentResponse {
+    #[serde(default)]
+    candidates: Vec<Candidate>,
+}
+
+#[derive(Deserialize)]
+struct ApiErrorBody {
+    error: ApiErrorDetail,
+}
+
+#[derive(Deserialize)]
+struct ApiErrorDetail {
+    message: String,
+}
+
+pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrError> {
+    let (mime_type, data) = parse_data_url(image_data_url)?;
+
+    let body = GenerateContentRequest {
+        contents: vec![Content {
+            parts: vec![
+                Part::InlineData {
+                    inline_data: InlineData { mime_type, data },
+                },
+                Part::Text {
+                    text: PROMPT.to_string(),
+                },
+            ],
+        }],
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(api_url())
+        .header("x-goog-api-key", api_key)
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| OcrError::Network(e.to_string()))?;
+
+    let status = response.status();
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| OcrError::Network(e.to_string()))?;
+
+    if !status.is_success() {
+        let message = serde_json::from_slice::<ApiErrorBody>(&bytes)
+            .map(|b| b.error.message)
+            .unwrap_or_else(|_| String::from_utf8_lossy(&bytes).to_string());
+        return Err(OcrError::Api {
+            status: status.as_u16(),
+            message,
+        });
+    }
+
+    let parsed: GenerateContentResponse = serde_json::from_slice(&bytes)
+        .map_err(|e| OcrError::UnparseableResponse(e.to_string()))?;
+
+    parsed
+        .candidates
+        .into_iter()
+        .next()
+        .and_then(|c| c.content.parts.into_iter().find_map(|p| p.text))
+        .map(|text| text.trim().to_string())
+        .ok_or_else(|| OcrError::UnparseableResponse("no text part in response".into()))
+}

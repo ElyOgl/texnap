@@ -17,9 +17,9 @@ v1 scope is **isolated formulas** (Mathpix-Snip style), not full mixed text+math
 
 - **Tauri 2** (Rust) + React 19 + TypeScript + Vite + Tailwind CSS 4. Packages to a native `.app` / `.dmg` via `npm run tauri build`.
 - **Not Next.js, not Vercel.** texnap started as a Next.js web app (2026-09-23) and pivoted to Tauri the same day, before any real UI was built — see `DECISIONS.md` § Tauri pivot for why. Nothing web-hosted remains; the app never needs to be deployed anywhere.
-- OCR engine: **vision LLM (Anthropic Claude primary)**, called from a **Rust `#[tauri::command]`**, not from JS/the webview. Chosen over pix2tex/UniMERNet (needs GPU inference infra) and over Mathpix (closed, paid). Doing the API call in Rust rather than in the webview keeps the API key out of the JS/DOM context entirely. The call sits behind a small Rust-side abstraction so a fallback provider (Gemini, Mathpix, self-hosted) could be added later without touching the UI.
+- OCR engine: **vision LLM, user's choice of provider**, called from a **Rust `#[tauri::command]`**, not from JS/the webview. `src-tauri/src/provider.rs` defines the provider list (**Gemini** — default, has a free tier — and **Anthropic**); `src-tauri/src/ocr/` has one module per provider, dispatched from `ocr/mod.rs`. Chosen over pix2tex/UniMERNet (needs GPU inference infra) and over Mathpix (closed, paid). Doing the API call in Rust rather than in the webview keeps the API key out of the JS/DOM context entirely. Adding a third provider is a new enum variant + a new module, not a redesign.
 - Rendering: KaTeX for the live preview (fast, good coverage; MathJax only if KaTeX proves too limited for something we actually hit).
-- API key: read from a local `.env` (via the `dotenvy` crate) for now during dev. Moving it to macOS Keychain via a Tauri plugin is a nice-to-have hardening step (P4), not a v1 blocker — this is a single-user local tool, not a hosted service.
+- API key: per-provider, resolved in `config.rs` — env var/`.env` (via `dotenvy`) in dev, else `config.json` in the app's data dir (one key per provider, switching providers doesn't lose the other's key). Moving to macOS Keychain via a Tauri plugin is a nice-to-have hardening step (P4), not a v1 blocker — this is a single-user local tool, not a hosted service.
 - No database, no auth for v1. If this ever needs history persistence, that's a new decision, not an assumption baked in now.
 - Packaging: `npm run tauri build` produces a `.dmg` under `src-tauri/target/release/bundle/dmg/`. **No Apple code signing / notarization** — this is for personal use only. Gatekeeper will flag the unsigned app on first launch; right-click → Open (or `xattr -cr` on the `.app`) clears it once. Only becomes a real requirement (Apple Developer Program, notarization) if texnap is ever given to someone else.
 
@@ -27,7 +27,7 @@ v1 scope is **isolated formulas** (Mathpix-Snip style), not full mixed text+math
 
 - Code + repo: `/Users/elyo/Desktop/TRINITY/texnap/` — private `github.com/ElyOgl/texnap`, branch `main`.
   - `src/` — React/TS frontend (Vite).
-  - `src-tauri/` — Rust backend: window setup (`src/lib.rs`), Tauri commands (OCR call lands here in P2).
+  - `src-tauri/src/` — Rust backend: `lib.rs` (window setup, command registration), `capture.rs` (file→base64 for drop/picker), `config.rs` (provider/key resolution + storage), `provider.rs` (the `Provider` enum), `ocr/` (one module per provider: `anthropic.rs`, `gemini.rs`, dispatched from `mod.rs`).
 - Docs: `/Users/elyo/Desktop/TRINITY/Trinity/TEXNAP/` — hub is `TEXNAP-Index.md`, live state in `STATUS.md`, roadmap/phases in `ROADMAP.md`, locked calls in `DECISIONS.md`. Never write texnap notes into another project's Trinity folder.
 
 ## Local dev
