@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>texnap — provider eval</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0 auto; padding: 24px; max-width: 1100px;
+        font: 15px/1.5 ui-sans-serif, system-ui, sans-serif;
+        color: #18181b; background: #fafafa;
+      }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .sub { color: #71717a; margin: 0 0 24px; }
+      table { border-collapse: collapse; width: 100%; margin-bottom: 32px; }
+      th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e4e4e7; }
+      th { font-weight: 600; color: #52525b; }
+      .case { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 16px; margin-bottom: 24px; }
+      .case h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: #52525b; }
+      .source { border: 1px solid #e4e4e7; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+      .source img { display: block; width: 100%; max-height: 260px; object-fit: contain; background: #fff; }
+      .outcome { border-top: 1px solid #f4f4f5; padding-top: 12px; margin-top: 12px; }
+      .outcome-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+      .provider { font-weight: 600; }
+      .ms { color: #a1a1aa; font-size: 13px; }
+      .render { background: #fff; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; overflow-x: auto; }
+      pre { background: #f4f4f5; padding: 8px 10px; border-radius: 6px; font-size: 13px; white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; }
+      .err { color: #b91c1c; }
+      .warn { color: #b45309; font-size: 13px; margin-top: 6px; }
+      .score { margin-left: auto; display: flex; gap: 6px; }
+      .score button {
+        border: 1px solid #d4d4d8; background: #fff; border-radius: 6px;
+        padding: 3px 10px; font-size: 13px; cursor: pointer;
+      }
+      .score button[aria-pressed="true"] { background: #18181b; color: #fff; border-color: #18181b; }
+      .empty { color: #a1a1aa; }
+      .storage-warning {
+        background: #fef3c7; border: 1px solid #f59e0b; color: #78350f;
+        border-radius: 8px; padding: 10px 12px; margin: 0 0 20px; font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>texnap — provider eval</h1>
+    <p class="sub" id="sub">Score each output against the image above it.</p>
+
+    <p id="storage-warning" class="storage-warning" hidden></p>
+    <table id="summary"></table>
+    <div id="cases"></div>
+
+    <script>
+      // The runner replaces this whole token, brackets included, so an
+      // un-substituted template still parses as an empty report.
+      const DATA = /*__DATA__*/[];
+      const SCORES_KEY = "texnap-eval-scores";
+      const LABELS = { exact: "Exact", close: "Close", wrong: "Wrong" };
+
+      // Storage is blocked on data: URLs and, in Safari, often on file:// too.
+      // Failing silently would mean losing an hour of scoring on a reload with
+      // no warning, so check up front and say so.
+      const storageWorks = (() => {
+        try {
+          localStorage.setItem("__texnap_probe", "1");
+          localStorage.removeItem("__texnap_probe");
+          return true;
+        } catch { return false; }
+      })();
+
+      if (storageWorks) {
+        document.getElementById("sub").textContent +=
+          " Scores are kept in this browser, so you can close and come back.";
+      } else {
+        const el = document.getElementById("storage-warning");
+        el.hidden = false;
+        el.textContent =
+          "This browser won't let the page remember your scores (storage is " +
+          "blocked for local files here). Scoring still works, but it is lost " +
+          "if you reload — finish in one sitting, or open this file in Chrome.";
+      }
+
+      const loadScores = () => {
+        if (!storageWorks) return {};
+        try { return JSON.parse(localStorage.getItem(SCORES_KEY)) || {}; }
+        catch { return {}; }
+      };
+      const saveScores = (s) => {
+        if (!storageWorks) return;
+        try { localStorage.setItem(SCORES_KEY, JSON.stringify(s)); } catch {}
+      };
+      let scores = loadScores();
+
+      // Same approach as the app: split on blank lines (the OCR prompt tells
+      // the model to separate independent formulas that way) and render each
+      // block, falling back to a lenient render so a partial preview shows.
+      function renderLatex(el, latex) {
+        const blocks = latex.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+        let failed = null;
+        el.innerHTML = "";
+        for (const block of blocks) {
+          const div = document.createElement("div");
+          try {
+            div.innerHTML = katex.renderToString(block, { displayMode: true, throwOnError: true });
+          } catch (err) {
+            failed = failed || String(err.message || err).split("\n")[0];
+            try {
+              div.innerHTML = katex.renderToString(block, { displayMode: true, throwOnError: false });
+            } catch { div.textContent = block; }
+          }
+          el.appendChild(div);
+        }
+        return failed;
+      }
+
+      function renderSummary() {
+        const providers = [...new Set(DATA.flatMap((c) => c.outcomes.map((o) => o.provider)))];
+        const rows = providers.map((p) => {
+          const outcomes = DATA.flatMap((c) =>
+            c.outcomes.filter((o) => o.provider === p).map((o) => ({ ...o, file: c.fileName })),
+          );
+          const tally = { exact: 0, close: 0, wrong: 0, unscored: 0 };
+          for (const o of outcomes) {
+            const s = scores[`${o.file}::${p}`];
+            if (s) tally[s]++; else tally.unscored++;
+          }
+          const errors = outcomes.filter((o) => o.error).length;
+          const times = outcomes.filter((o) => !o.error).map((o) => o.millis);
+          const median = times.length
+            ? [...times].sort((a, b) => a - b)[Math.floor(times.length / 2)]
+            : null;
+          return { p, tally, errors, median, total: outcomes.length };
+        });
+
+        document.getElementById("summary").innerHTML =
+          `<thead><tr><th>Provider</th><th>Exact</th><th>Close</th><th>Wrong</th>
+           <th>Unscored</th><th>API errors</th><th>Median latency</th></tr></thead><tbody>` +
+          rows
+            .map(
+              (r) =>
+                `<tr><td><strong>${r.p}</strong></td><td>${r.tally.exact}/${r.total}</td>
+                 <td>${r.tally.close}</td><td>${r.tally.wrong}</td><td>${r.tally.unscored}</td>
+                 <td>${r.errors}</td><td>${r.median === null ? "—" : r.median + " ms"}</td></tr>`,
+            )
+            .join("") +
+          `</tbody>`;
+      }
+
+      function build() {
+        const root = document.getElementById("cases");
+        if (!DATA.length) {
+          root.innerHTML = `<p class="empty">No results — run the eval first.</p>`;
+          return;
+        }
+        for (const c of DATA) {
+          const wrap = document.createElement("div");
+          wrap.className = "case";
+          wrap.innerHTML = `<h2>${c.fileName}</h2>
+            <div class="source"><img src="${c.dataUrl}" alt="${c.fileName}"></div>`;
+
+          for (const o of c.outcomes) {
+            const box = document.createElement("div");
+            box.className = "outcome";
+
+            const head = document.createElement("div");
+            head.className = "outcome-head";
+            head.innerHTML = `<span class="provider">${o.provider}</span>
+              <span class="ms">${o.millis} ms</span>`;
+
+            const score = document.createElement("div");
+            score.className = "score";
+            for (const key of Object.keys(LABELS)) {
+              const btn = document.createElement("button");
+              btn.textContent = LABELS[key];
+              const id = `${c.fileName}::${o.provider}`;
+              btn.setAttribute("aria-pressed", scores[id] === key ? "true" : "false");
+              btn.onclick = () => {
+                if (scores[id] === key) delete scores[id];
+                else scores[id] = key;
+                saveScores(scores);
+                refresh();
+              };
+              score.appendChild(btn);
+            }
+            head.appendChild(score);
+            box.appendChild(head);
+
+            if (o.error) {
+              const err = document.createElement("p");
+              err.className = "err";
+              err.textContent = o.error;
+              box.appendChild(err);
+            } else {
+              const render = document.createElement("div");
+              render.className = "render";
+              const failed = renderLatex(render, o.latex || "");
+              box.appendChild(render);
+              if (failed) {
+                const warn = document.createElement("p");
+                warn.className = "warn";
+                warn.textContent = `Preview incomplete (${failed}) — the LaTeX may still be correct.`;
+                box.appendChild(warn);
+              }
+              const pre = document.createElement("pre");
+              pre.textContent = o.latex || "";
+              box.appendChild(pre);
+            }
+            wrap.appendChild(box);
+          }
+          root.appendChild(wrap);
+        }
+      }
+
+      function refresh() {
+        document.getElementById("cases").innerHTML = "";
+        build();
+        renderSummary();
+      }
+
+      refresh();
+    </script>
+  </body>
+</html>

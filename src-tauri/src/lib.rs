@@ -1,7 +1,10 @@
-mod capture;
+// Public so the eval runner (`examples/eval.rs`) can drive the *same* code
+// path the app uses. An eval that reimplements the API calls measures a
+// reimplementation, not the app.
+pub mod capture;
 mod config;
-mod ocr;
-mod provider;
+pub mod ocr;
+pub mod provider;
 
 use tauri::AppHandle;
 
