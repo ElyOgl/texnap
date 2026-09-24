@@ -1,7 +1,13 @@
 use super::{parse_data_url, OcrError, PROMPT};
 use serde::{Deserialize, Serialize};
 
-const MODEL: &str = "gemini-2.5-flash";
+// gemini-2.5-flash returned 404 "no longer available to new users" as of
+// 2026-09-24 — Google is retiring old Flash generations fairly quickly.
+// generateContent itself is NOT deprecated (Google: "recommended path for
+// stable deployments"), only individual model IDs churn; if this 404s again,
+// check https://ai.google.dev/gemini-api/docs/models for the current Flash
+// model rather than assuming the endpoint shape changed.
+const MODEL: &str = "gemini-3.6-flash";
 
 fn api_url() -> String {
     format!("https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent")
