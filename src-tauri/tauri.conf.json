@@ -13,9 +13,12 @@
     "windows": [
       {
         "title": "texnap",
-        "width": 900,
-        "height": 820,
-        "dragDropEnabled": true
+        "width": 500,
+        "height": 640,
+        "minWidth": 420,
+        "minHeight": 480,
+        "dragDropEnabled": true,
+        "backgroundColor": "#121214"
       }
     ],
     "security": {

@@ -1,1 +1,63 @@
 @import "tailwindcss";
+
+/* Design direction 03 "Compact power-tool" — tokens ported from
+   design/mockups/03-compact-tool.html. @theme exposes them as Tailwind
+   utilities (bg-surface, text-ink-2, border-line, …). */
+@theme {
+  --color-canvas: #08080a;
+  --color-surface: #121214;
+  --color-surface-2: #1a1a1d;
+  --color-surface-3: #232327;
+  --color-titlebar: #161618;
+
+  --color-ink: #f4f4f6;
+  --color-ink-2: #a1a1aa;
+  --color-ink-3: #6c6c76;
+
+  --color-accent: #ff6f5e;
+  --color-accent-ink: #1a0d0b;
+  --color-ok: #46d38a;
+
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-2: rgba(255, 255, 255, 0.14);
+
+  --color-kbd: #26262b;
+  --color-paper: #fbfbfd;
+  --color-paper-ink: #14141a;
+
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(700px 360px at 50% -10%, #131317 0%, var(--color-surface) 62%);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keycap — reused across every hint bar and action button */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+  color: var(--color-ink);
+  background: var(--color-kbd);
+  border: 1px solid var(--color-line-2);
+  border-radius: 5px;
+  padding: 3px 6px;
+  min-width: 18px;
+  text-align: center;
+  display: inline-block;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+/* Rendered formula sits on a white paper card, matching the source screenshot */
+.katex-display { margin: 0; }
