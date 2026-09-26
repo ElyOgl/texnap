@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { CapturedImage } from "../lib/image";
 import { renderBlock, splitBlocks } from "../lib/latex";
+import { isEditableTarget } from "../lib/dom";
+import type { Session } from "../lib/session";
 import { HintBar } from "./ui";
 import "katex/dist/katex.min.css";
 
 type Props = {
-  image: CapturedImage;
+  session: Session;
+  canUndo: boolean;
+  onResult: (imageId: string, latex: string, provider: string, seconds: number) => void;
+  onLatexChange: (latex: string) => void;
   onClear: () => void;
 };
 
@@ -16,21 +20,19 @@ type Transcription = {
   providerLabel: string;
 };
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null;
-  if (!el) return false;
-  const tag = el.tagName;
-  return tag === "TEXTAREA" || tag === "INPUT" || el.isContentEditable;
-}
-
-export function ImagePreview({ image, onClear }: Props) {
-  const [latex, setLatex] = useState<string | null>(null);
-  const [provider, setProvider] = useState<string | null>(null);
-  const [seconds, setSeconds] = useState<number | null>(null);
+export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClear }: Props) {
+  const { image, latex, provider, seconds } = session;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  // A new capture (or an undo/redo) is a different image — drop any transient
+  // state tied to the previous one.
+  useEffect(() => {
+    setError(null);
+    setCopied(false);
+    setLoading(false);
+  }, [image.id]);
 
   const blocks = useMemo(
     () => (latex ? splitBlocks(latex).map(renderBlock) : []),
@@ -41,15 +43,18 @@ export function ImagePreview({ image, onClear }: Props) {
   const transcribe = async () => {
     setLoading(true);
     setError(null);
-    setLatex(null);
+    const startedForImage = image.id;
     const started = performance.now();
     try {
       const result = await invoke<Transcription>("ocr_transcribe", {
         imageDataUrl: image.dataUrl,
       });
-      setLatex(result.latex);
-      setProvider(result.providerLabel);
-      setSeconds((performance.now() - started) / 1000);
+      onResult(
+        startedForImage,
+        result.latex,
+        result.providerLabel,
+        (performance.now() - started) / 1000,
+      );
     } catch (err) {
       setError(String(err));
     } finally {
@@ -64,8 +69,7 @@ export function ImagePreview({ image, onClear }: Props) {
     window.setTimeout(() => setCopied(false), 1500);
   };
 
-  // ⏎ transcribe (unless typing in a field), ⌘C copy (unless a field is
-  // focused, so native copy still works while editing the LaTeX).
+  // ⏎ transcribe, ⌘C copy — deferring to native behaviour inside text fields.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter" && !e.metaKey && !isEditableTarget(e.target)) {
@@ -83,7 +87,6 @@ export function ImagePreview({ image, onClear }: Props) {
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3.5">
-        {/* Source screenshot */}
         <div>
           <div className="mb-1.5 flex items-center justify-between text-[11px] text-ink-3">
             <span>Source</span>
@@ -128,13 +131,10 @@ export function ImagePreview({ image, onClear }: Props) {
 
         {latex && (
           <>
-            {/* Rendered — white paper card, full width so the formula is readable */}
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-ink-3">
                 <span>Rendered</span>
-                {renderErrors.length === 0 && (
-                  <span className="text-ok">✓ renders</span>
-                )}
+                {renderErrors.length === 0 && <span className="text-ok">✓ renders</span>}
               </div>
               <div className="overflow-x-auto rounded-lg bg-paper px-4 py-3 text-paper-ink">
                 {blocks.map((block, i) => (
@@ -153,20 +153,17 @@ export function ImagePreview({ image, onClear }: Props) {
               )}
             </div>
 
-            {/* Editable LaTeX */}
             <div>
               <div className="mb-1.5 text-[11px] text-ink-3">LaTeX</div>
               <textarea
-                ref={editorRef}
                 value={latex}
-                onChange={(e) => setLatex(e.currentTarget.value)}
+                onChange={(e) => onLatexChange(e.currentTarget.value)}
                 spellCheck={false}
                 rows={Math.min(8, latex.split("\n").length + 1)}
                 className="w-full resize-y rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5 font-mono text-[12px] leading-relaxed text-ink outline-none focus:border-accent/50"
               />
             </div>
 
-            {/* Actions */}
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-ink-3">
                 {copied ? (
@@ -192,20 +189,17 @@ export function ImagePreview({ image, onClear }: Props) {
       </div>
 
       <HintBar
-        hints={
-          latex
+        hints={[
+          ...(latex
             ? [
                 { keys: ["⌘", "C"], label: "Copy" },
-                { keys: ["⌘", "V"], label: "New" },
                 { keys: ["⏎"], label: "Re-run" },
-                { keys: ["⌘", ","], label: "Settings", right: true },
               ]
-            : [
-                { keys: ["⏎"], label: "Transcribe" },
-                { keys: ["⌘", "V"], label: "New" },
-                { keys: ["⌘", ","], label: "Settings", right: true },
-              ]
-        }
+            : [{ keys: ["⏎"], label: "Transcribe" }]),
+          { keys: ["⌘", "V"], label: "New" },
+          ...(canUndo ? [{ keys: ["⌘", "Z"], label: "Undo" }] : []),
+          { keys: ["⌘", ","], label: "Settings", right: true },
+        ]}
       />
     </div>
   );

@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ApiKeySetup } from "./components/ApiKeySetup";
 import { CaptureZone } from "./components/CaptureZone";
 import { ImagePreview } from "./components/ImagePreview";
 import { HintBar } from "./components/ui";
 import { useImageCapture } from "./lib/useImageCapture";
+import { isEditableTarget } from "./lib/dom";
+import { historyReducer, initialHistory } from "./lib/session";
 import type { CapturedImage } from "./lib/image";
 import type { ConfigStatus, ProviderInfo } from "./lib/providers";
 import "./App.css";
@@ -13,8 +15,9 @@ function App() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [activeProviderLabel, setActiveProviderLabel] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [image, setImage] = useState<CapturedImage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, dispatch] = useReducer(historyReducer, initialHistory);
+  const session = history.present;
 
   const refresh = useCallback(async () => {
     const [status, list] = await Promise.all([
@@ -31,27 +34,34 @@ function App() {
     void refresh();
   }, [refresh]);
 
+  // A new capture resets the result view; the previous session is kept on the
+  // undo stack so ⌘Z brings it (and its LaTeX) back.
   const handleCapture = useCallback((img: CapturedImage) => {
     setError(null);
-    setImage(img);
+    dispatch({ type: "capture", image: img });
   }, []);
   const handleError = useCallback((msg: string) => setError(msg), []);
 
   const captureEnabled = configured === true && !showSettings;
   const { isDragging, pickFile } = useImageCapture(handleCapture, handleError, captureEnabled);
 
-  // ⌘, opens settings from anywhere in the tool (Esc / ⌘⏎ are owned by the
-  // settings screen itself).
+  // ⌘, settings, and ⌘Z / ⌘⇧Z session undo-redo — but not while a text field
+  // is focused, where ⌘Z is the textarea's own undo.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "," && e.metaKey && configured) {
         e.preventDefault();
         setShowSettings(true);
+        return;
+      }
+      if (e.metaKey && e.key.toLowerCase() === "z" && !showSettings && !isEditableTarget(e.target)) {
+        e.preventDefault();
+        dispatch({ type: e.shiftKey ? "redo" : "undo" });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [configured]);
+  }, [configured, showSettings]);
 
   const settingsDone = () => {
     setShowSettings(false);
@@ -93,8 +103,16 @@ function App() {
             onDone={settingsDone}
             onCancel={configured ? () => setShowSettings(false) : undefined}
           />
-        ) : image ? (
-          <ImagePreview image={image} onClear={() => setImage(null)} />
+        ) : session ? (
+          <ImagePreview
+            session={session}
+            canUndo={history.past.length > 0}
+            onResult={(imageId, latex, provider, seconds) =>
+              dispatch({ type: "result", imageId, latex, provider, seconds })
+            }
+            onLatexChange={(latex) => dispatch({ type: "editLatex", latex })}
+            onClear={() => dispatch({ type: "clear" })}
+          />
         ) : (
           <div className="flex flex-1 flex-col">
             <div className="flex-1 overflow-y-auto p-3.5">
@@ -107,6 +125,7 @@ function App() {
             <HintBar
               hints={[
                 { keys: ["⌘", "V"], label: "Paste" },
+                ...(history.past.length > 0 ? [{ keys: ["⌘", "Z"], label: "Undo" }] : []),
                 { keys: ["⌘", ","], label: "Settings", right: true },
               ]}
             />

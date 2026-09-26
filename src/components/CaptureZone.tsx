@@ -10,11 +10,13 @@ type Props = {
 // the App level so it works in any view — this is just the drop-zone surface.
 export function CaptureZone({ isDragging, onPick, providerLabel }: Props) {
   return (
+    // Space is left above the drop zone on purpose — a small header will go
+    // there later.
     <div className="flex flex-col gap-3">
       <button
         type="button"
         onClick={onPick}
-        className={`flex h-52 flex-col items-center justify-center gap-3 rounded-lg border-[1.5px] border-dashed px-4 text-center transition-colors ${
+        className={`flex h-36 flex-col items-center justify-center gap-3 rounded-lg border-[1.5px] border-dashed px-4 text-center transition-colors ${
           isDragging
             ? "border-accent bg-accent/10"
             : "border-line-2 bg-surface-2 hover:border-ink-3"

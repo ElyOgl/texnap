@@ -8,6 +8,8 @@ export const ALLOWED_MIME_TYPES = [
 ] as const;
 
 export type CapturedImage = {
+  /** Stable per-capture id — identifies a capture across the undo history. */
+  id: string;
   dataUrl: string;
   fileName: string;
 };

@@ -36,7 +36,11 @@ export function useImageCapture(
           "read_image_as_base64",
           { path },
         );
-        onCapture({ dataUrl: result.data_url, fileName: result.file_name });
+        onCapture({
+          id: crypto.randomUUID(),
+          dataUrl: result.data_url,
+          fileName: result.file_name,
+        });
       } catch (err) {
         onError(String(err));
       }
@@ -69,7 +73,11 @@ export function useImageCapture(
             return;
           }
           const dataUrl = await blobToDataUrl(blob);
-          onCapture({ dataUrl, fileName: `pasted-${Date.now()}.png` });
+          onCapture({
+            id: crypto.randomUUID(),
+            dataUrl,
+            fileName: `pasted-${Date.now()}.png`,
+          });
           return;
         }
       }
