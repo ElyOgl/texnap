@@ -1,0 +1,16 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1c1c20"/>
+      <stop offset="1" stop-color="#0c0c0e"/>
+    </linearGradient>
+  </defs>
+  <!-- Dark squircle body; corners stay transparent so macOS shows rounded edges -->
+  <rect x="8" y="8" width="1008" height="1008" rx="228" ry="228" fill="url(#bg)"/>
+  <rect x="8.5" y="8.5" width="1007" height="1007" rx="227.5" ry="227.5"
+        fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="2"/>
+  <!-- Sigma: reads as "math" instantly, in the app's coral accent -->
+  <polyline points="690,338 356,338 540,512 356,686 690,686"
+            fill="none" stroke="#ff6f5e" stroke-width="82"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
