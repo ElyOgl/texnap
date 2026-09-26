@@ -61,3 +61,15 @@ body {
 
 /* Rendered formula sits on a white paper card, matching the source screenshot */
 .katex-display { margin: 0; }
+
+/* Mixed text+math preview (theorem/proof blocks, not just bare formulas) */
+.tex-render { line-height: 1.55; }
+.tex-render .katex-display { margin: 0.5em 0; }
+.tex-render ul,
+.tex-render ol {
+  margin: 0.4em 0;
+  padding-left: 1.3em;
+}
+.tex-render ul { list-style: disc; }
+.tex-render ol { list-style: decimal; }
+.tex-render li { margin: 0.2em 0; }

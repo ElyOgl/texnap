@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { renderBlock, splitBlocks } from "../lib/latex";
+import { renderLatex } from "../lib/latex";
 import { isEditableTarget } from "../lib/dom";
 import type { Session } from "../lib/session";
 import { HintBar } from "./ui";
@@ -34,11 +34,7 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
     setLoading(false);
   }, [image.id]);
 
-  const blocks = useMemo(
-    () => (latex ? splitBlocks(latex).map(renderBlock) : []),
-    [latex],
-  );
-  const renderErrors = blocks.filter((b) => b.error !== null);
+  const rendered = useMemo(() => (latex ? renderLatex(latex) : null), [latex]);
 
   const transcribe = async () => {
     setLoading(true);
@@ -134,18 +130,14 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-ink-3">
                 <span>Rendered</span>
-                {renderErrors.length === 0 && <span className="text-ok">✓ renders</span>}
+                {rendered && !rendered.hadError && <span className="text-ok">✓ renders</span>}
               </div>
-              <div className="overflow-x-auto rounded-lg bg-paper px-4 py-3 text-paper-ink">
-                {blocks.map((block, i) => (
-                  <div
-                    key={i}
-                    // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{ __html: block.html }}
-                  />
-                ))}
-              </div>
-              {renderErrors.length > 0 && (
+              <div
+                className="tex-render overflow-x-auto rounded-lg bg-paper px-4 py-3 text-paper-ink"
+                // eslint-disable-next-line react/no-danger
+                dangerouslySetInnerHTML={{ __html: rendered?.html ?? "" }}
+              />
+              {rendered?.hadError && (
                 <p className="mt-1.5 text-[11px] text-amber-400/90">
                   Preview incomplete — the LaTeX may still be correct (KaTeX can&rsquo;t
                   render part of it).
