@@ -38,6 +38,10 @@ pub fn run() {
     dotenvy::dotenv().ok();
 
     tauri::Builder::default()
+        // Remembers the window's size and position across restarts, restoring
+        // it on the next launch (falls back to the tauri.conf.json defaults on
+        // first run).
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
