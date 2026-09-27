@@ -18,8 +18,9 @@ pub fn capture_region_to_data_url() -> Option<String> {
             .unwrap_or(0)
     ));
 
-    // -i interactive selection, -x no capture sound.
-    let ok = std::process::Command::new("screencapture")
+    // -i interactive selection, -x no capture sound. Absolute path — a GUI
+    // app's PATH can be minimal.
+    let ok = std::process::Command::new("/usr/sbin/screencapture")
         .arg("-i")
         .arg("-x")
         .arg(&tmp)

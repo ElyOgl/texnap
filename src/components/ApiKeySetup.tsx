@@ -9,29 +9,45 @@ type Props = {
   onCancel?: () => void;
 };
 
-// Build a Tauri accelerator ("Cmd+Ctrl+M") from a keydown, or null if it's
-// modifier-only or an unsupported key. A global shortcut needs a modifier.
-function accelFromEvent(e: KeyboardEvent): string | null {
+const SYMBOLS: Record<string, string> = { Cmd: "⌘", Ctrl: "⌃", Alt: "⌥", Shift: "⇧" };
+
+// The binding uses e.code (the PHYSICAL key) so the shortcut fires regardless of
+// keyboard layout — macOS matches hotkeys by physical position, so binding "M"
+// by character breaks on AZERTY. The display label uses e.key (the character the
+// user actually pressed) so what they see matches what they typed.
+function accelFromEvent(e: KeyboardEvent): { accel: string; label: string } | null {
   const mods: string[] = [];
   if (e.metaKey) mods.push("Cmd");
   if (e.ctrlKey) mods.push("Ctrl");
   if (e.altKey) mods.push("Alt");
   if (e.shiftKey) mods.push("Shift");
   const code = e.code;
-  let key: string | null = null;
-  if (/^Key[A-Z]$/.test(code)) key = code.slice(3);
-  else if (/^Digit[0-9]$/.test(code)) key = code.slice(5);
-  else if (/^F[0-9]{1,2}$/.test(code)) key = code;
-  else if (code === "Space") key = "Space";
-  if (!key || mods.length === 0) return null;
-  return [...mods, key].join("+");
+  // Ignore lone modifier presses — keep waiting for a real key.
+  if (/^(Meta|Control|Alt|Shift|OS)(Left|Right)?$/.test(code)) return null;
+  if (mods.length === 0) return null; // a global shortcut needs a modifier
+  const labelKey =
+    e.key && e.key.length === 1 ? e.key.toUpperCase() : code === "Space" ? "Space" : e.key || code;
+  return {
+    accel: [...mods, code].join("+"),
+    label: [...mods.map((m) => SYMBOLS[m] ?? m), labelKey].join(" "),
+  };
 }
 
-const SYMBOLS: Record<string, string> = { Cmd: "⌘", Ctrl: "⌃", Alt: "⌥", Shift: "⇧" };
+// Cold-load display of a stored (code-based) accelerator.
 function prettyShortcut(accel: string): string {
   return accel
     .split("+")
-    .map((part) => SYMBOLS[part] ?? part)
+    .map((part) => {
+      if (SYMBOLS[part]) return SYMBOLS[part];
+      if (/^Key[A-Z]$/.test(part)) return part.slice(3);
+      if (/^Digit[0-9]$/.test(part)) return part.slice(5);
+      const punct: Record<string, string> = {
+        Semicolon: ";", Comma: ",", Period: ".", Slash: "/", Quote: "'",
+        Backquote: "`", Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]",
+        Backslash: "\\",
+      };
+      return punct[part] ?? part;
+    })
     .join(" ");
 }
 
@@ -43,7 +59,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [shortcut, setShortcut] = useState<string | null>(null);
+  const [shortcutLabel, setShortcutLabel] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
 
@@ -57,7 +73,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
       setProviders(providerList);
       setSavedProviders(status.savedProviders);
       setSelected(status.activeProvider);
-      setShortcut(sc);
+      setShortcutLabel(prettyShortcut(sc));
     })();
   }, []);
 
@@ -71,13 +87,13 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
         setRecording(false);
         return;
       }
-      const accel = accelFromEvent(e);
-      if (!accel) return; // modifier-only or unsupported key — keep waiting
+      const result = accelFromEvent(e);
+      if (!result) return; // modifier-only — keep waiting
       setRecording(false);
       void (async () => {
         try {
-          await invoke("set_shortcut", { shortcut: accel });
-          setShortcut(accel);
+          await invoke("set_shortcut", { shortcut: result.accel });
+          setShortcutLabel(result.label);
           setShortcutError(null);
         } catch (err) {
           setShortcutError(String(err));
@@ -204,7 +220,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
           <label className="mb-1.5 block text-[11px] text-ink-3">Global capture shortcut</label>
           <div className="flex items-center gap-2">
             <span className="rounded-md border border-line-2 bg-surface-2 px-2.5 py-1.5 font-mono text-[12px] text-ink">
-              {recording ? "Press keys…" : shortcut ? prettyShortcut(shortcut) : "—"}
+              {recording ? "Press keys…" : shortcutLabel ?? "—"}
             </span>
             <button
               type="button"

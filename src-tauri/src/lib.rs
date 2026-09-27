@@ -33,6 +33,14 @@ fn parse_shortcut(accel: &str) -> Option<Shortcut> {
 }
 
 fn key_to_code(k: &str) -> Option<Code> {
+    // A full KeyboardEvent.code name from the recorder — "KeyM", "Semicolon",
+    // "Digit2", "F5", "Space". This is the PHYSICAL key, which is what macOS
+    // hotkeys match, so a recorded shortcut fires regardless of layout (AZERTY
+    // etc.).
+    if let Ok(code) = Code::from_str(k) {
+        return Some(code);
+    }
+    // Or a hand-typed single letter/digit.
     let up = k.to_ascii_uppercase();
     let name = if up.len() == 1 && up.as_bytes()[0].is_ascii_alphabetic() {
         format!("Key{up}")
@@ -41,7 +49,7 @@ fn key_to_code(k: &str) -> Option<Code> {
     } else if up == "SPACE" {
         "Space".to_string()
     } else {
-        up // F1..F12, or an already-qualified Code name
+        return None;
     };
     Code::from_str(&name).ok()
 }
@@ -54,9 +62,7 @@ fn register_shortcut(app: &AppHandle, accel: &str) -> Result<(), String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     gs.register(shortcut)
-        .map_err(|e| format!("Couldn't register the shortcut \"{accel}\": {e}"))?;
-    eprintln!("[texnap] global shortcut registered: {accel}");
-    Ok(())
+        .map_err(|e| format!("Couldn't register the shortcut \"{accel}\": {e}"))
 }
 
 #[tauri::command]
@@ -134,7 +140,6 @@ pub fn run() {
                     }
                     let app = app.clone();
                     std::thread::spawn(move || {
-                        eprintln!("[texnap] capture shortcut fired");
                         if let Some(data_url) = snip::capture_region_to_data_url() {
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.show();
