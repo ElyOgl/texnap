@@ -117,6 +117,25 @@ fn build_json(cases: &[Case]) -> String {
     json
 }
 
+// Reads the per-provider keys the app stored via its settings UI. The path
+// mirrors Tauri's app_data_dir for this bundle identifier on macOS; kept in
+// sync with `config.rs` (which owns the real resolution for the app itself).
+fn stored_keys() -> std::collections::HashMap<String, String> {
+    let Ok(home) = std::env::var("HOME") else {
+        return std::collections::HashMap::new();
+    };
+    let path = format!("{home}/Library/Application Support/fr.elyo.texnap/config.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return std::collections::HashMap::new();
+    };
+    #[derive(serde::Deserialize, Default)]
+    struct Stored {
+        #[serde(default)]
+        keys: std::collections::HashMap<String, String>,
+    }
+    serde_json::from_str::<Stored>(&text).map(|s| s.keys).unwrap_or_default()
+}
+
 #[tokio::main]
 async fn main() {
     let dir = eval_dir();
@@ -130,14 +149,24 @@ async fn main() {
         std::process::exit(1);
     }
 
+    // Resolve each provider's key the way the user actually has them set up:
+    // an env var if present, otherwise the key stored by the app's settings UI
+    // in config.json — so a run "just works" against whatever's configured,
+    // with no secret ever passed on the command line.
+    let stored = stored_keys();
     let active: Vec<(Provider, String)> = Provider::ALL
         .iter()
-        .filter_map(|p| std::env::var(p.env_var_name()).ok().map(|key| (*p, key)))
-        .filter(|(_, key)| !key.trim().is_empty())
+        .filter_map(|p| {
+            let key = std::env::var(p.env_var_name())
+                .ok()
+                .filter(|k| !k.trim().is_empty())
+                .or_else(|| stored.get(p.as_str()).filter(|k| !k.trim().is_empty()).cloned());
+            key.map(|k| (*p, k))
+        })
         .collect();
 
     if active.is_empty() {
-        eprintln!("No provider keys in the environment. Set at least one of:");
+        eprintln!("No provider keys found — set one in the app's settings, or export one of:");
         for p in Provider::ALL {
             eprintln!("  {}", p.env_var_name());
         }
@@ -146,7 +175,7 @@ async fn main() {
 
     for p in Provider::ALL {
         if !active.iter().any(|(active, _)| *active == p) {
-            println!("skipping {} — {} not set", p.as_str(), p.env_var_name());
+            println!("skipping {} — no key (env or config.json)", p.as_str());
         }
     }
 

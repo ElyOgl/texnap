@@ -28,7 +28,11 @@
       .outcome-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
       .provider { font-weight: 600; }
       .ms { color: #a1a1aa; font-size: 13px; }
-      .render { background: #fff; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; overflow-x: auto; }
+      .render { background: #fff; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
+      .render .katex-display { margin: 0.5em 0; }
+      .render ul, .render ol { margin: 0.4em 0; padding-left: 1.3em; }
+      .render ul { list-style: disc; } .render ol { list-style: decimal; }
+      .render li { margin: 0.2em 0; }
       pre { background: #f4f4f5; padding: 8px 10px; border-radius: 6px; font-size: 13px; white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; }
       .err { color: #b91c1c; }
       .warn { color: #b45309; font-size: 13px; margin-top: 6px; }
@@ -94,26 +98,122 @@
       };
       let scores = loadScores();
 
-      // Same approach as the app: split on blank lines (the OCR prompt tells
-      // the model to separate independent formulas that way) and render each
-      // block, falling back to a lenient render so a partial preview shows.
-      function renderLatex(el, latex) {
-        const blocks = latex.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-        let failed = null;
-        el.innerHTML = "";
-        for (const block of blocks) {
-          const div = document.createElement("div");
-          try {
-            div.innerHTML = katex.renderToString(block, { displayMode: true, throwOnError: true });
-          } catch (err) {
-            failed = failed || String(err.message || err).split("\n")[0];
-            try {
-              div.innerHTML = katex.renderToString(block, { displayMode: true, throwOnError: false });
-            } catch { div.textContent = block; }
-          }
-          el.appendChild(div);
+      // Mixed text+math renderer, mirroring the app's src/lib/latex.ts so the
+      // report previews whole theorem/proof captures the same way the app does
+      // (math islands via KaTeX; \textbf/\textit/itemize/etc. → HTML), not just
+      // bare formulas. Kept in sync with the app by hand.
+      const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;" };
+      const escapeText = (s) => s.replace(/[&<>]/g, (c) => ESC[c]);
+      function renderMath(tex, display, st) {
+        try {
+          return katex.renderToString(tex, { displayMode: display, throwOnError: true });
+        } catch (err) {
+          st.err = st.err || String(err.message || err).split("\n")[0];
+          try { return katex.renderToString(tex, { displayMode: display, throwOnError: false }); }
+          catch { return `<code>${escapeText(tex)}</code>`; }
         }
-        return failed;
+      }
+      function readGroup(s, i) {
+        let depth = 0, j = i, inner = "";
+        for (; j < s.length; j++) {
+          const c = s[j];
+          if (c === "{") { depth++; if (depth === 1) continue; }
+          else if (c === "}") { depth--; if (depth === 0) { j++; break; } }
+          inner += c;
+        }
+        return [inner, j];
+      }
+      function findEnd(s, from, env) {
+        const b = `\\begin{${env}}`, e = `\\end{${env}}`;
+        let depth = 1, i = from;
+        while (i < s.length) {
+          if (s.startsWith(b, i)) { depth++; i += b.length; }
+          else if (s.startsWith(e, i)) { depth--; if (depth === 0) return i; i += e.length; }
+          else i++;
+        }
+        return -1;
+      }
+      const TEXT_WRAP = { textbf: "strong", textit: "em", emph: "em", textsl: "em", underline: "u", texttt: "code" };
+      const PASSTHROUGH = new Set(["text", "mathrm", "textrm", "mbox", "textnormal", "textup", "textmd"]);
+      const DROP = new Set(["noindent", "centering", "par", "normalfont", "itshape", "bfseries", "small", "footnotesize", "large", "Large", "huge", "normalsize", "indent", "protect", "displaystyle", "textstyle"]);
+      const BREAK = new Set(["medskip", "bigskip", "smallskip", "newline"]);
+      const SPACE = new Set(["hfill", "quad", "qquad", "enspace", "thinspace"]);
+      const SYM = { square: "□", blacksquare: "■", qed: "□", ldots: "…", dots: "…" };
+      function convert(s, st) {
+        let out = "", i = 0, buf = "";
+        const flush = () => { if (buf) { out += escapeText(buf); buf = ""; } };
+        while (i < s.length) {
+          const c = s[i];
+          if (c === "$") {
+            flush();
+            if (s[i + 1] === "$") { const e = s.indexOf("$$", i + 2); out += renderMath(e === -1 ? s.slice(i + 2) : s.slice(i + 2, e), true, st); i = e === -1 ? s.length : e + 2; }
+            else { const e = s.indexOf("$", i + 1); out += renderMath(e === -1 ? s.slice(i + 1) : s.slice(i + 1, e), false, st); i = e === -1 ? s.length : e + 1; }
+            continue;
+          }
+          if (c === "\\") {
+            const two = s[i + 1];
+            if (two === "[") { flush(); const e = s.indexOf("\\]", i + 2); out += renderMath(e === -1 ? s.slice(i + 2) : s.slice(i + 2, e), true, st); i = e === -1 ? s.length : e + 2; continue; }
+            if (two === "(") { flush(); const e = s.indexOf("\\)", i + 2); out += renderMath(e === -1 ? s.slice(i + 2) : s.slice(i + 2, e), false, st); i = e === -1 ? s.length : e + 2; continue; }
+            if (two === "\\") { flush(); out += "<br>"; i += 2; continue; }
+            if (two && "{}%&_#$".includes(two)) { buf += two; i += 2; continue; }
+            if (two === "," || two === " " || two === ";" || two === ":" || two === "!") { buf += " "; i += 2; continue; }
+            if (two && /[a-zA-Z]/.test(two)) {
+              let j = i + 1, name = "";
+              while (j < s.length && /[a-zA-Z]/.test(s[j])) { name += s[j]; j++; }
+              if (s[j] === "*") j++;
+              if (name === "begin") {
+                flush(); let k = j; while (s[k] === " ") k++; let env = "";
+                if (s[k] === "{") { const [inner, nj] = readGroup(s, k); env = inner.trim(); k = nj; }
+                if (env === "itemize" || env === "enumerate") { const e = findEnd(s, k, env); out += renderList(e === -1 ? s.slice(k) : s.slice(k, e), env, st); i = e === -1 ? s.length : e + `\\end{${env}}`.length; }
+                else if (env) { const e = findEnd(s, k, env); const body = e === -1 ? s.slice(k) : s.slice(k, e); out += renderMath(`\\begin{${env}}${body}\\end{${env}}`, true, st); i = e === -1 ? s.length : e + `\\end{${env}}`.length; }
+                else i = k;
+                continue;
+              }
+              if (name === "end") { let k = j; while (s[k] === " ") k++; if (s[k] === "{") { const [, nj] = readGroup(s, k); k = nj; } i = k; continue; }
+              if (name === "item") { flush(); out += "<br>• "; i = j; continue; }
+              if (name === "vspace" || name === "hspace") { let k = j; while (s[k] === " ") k++; if (s[k] === "{") { const [, nj] = readGroup(s, k); k = nj; } if (name === "vspace") { flush(); out += '<div style="height:6px"></div>'; } else buf += " "; i = k; continue; }
+              if (BREAK.has(name)) { flush(); out += '<div style="height:8px"></div>'; i = j; continue; }
+              if (SPACE.has(name)) { buf += " "; i = j; continue; }
+              if (DROP.has(name)) { i = j; continue; }
+              if (TEXT_WRAP[name] || PASSTHROUGH.has(name)) {
+                let k = j; while (s[k] === " ") k++; let arg = "";
+                if (s[k] === "{") { const [inner, nj] = readGroup(s, k); arg = inner; k = nj; }
+                flush(); const inner = convert(arg, st);
+                out += TEXT_WRAP[name] ? `<${TEXT_WRAP[name]}>${inner}</${TEXT_WRAP[name]}>` : inner;
+                i = k; continue;
+              }
+              if (SYM[name]) { buf += SYM[name]; i = j; continue; }
+              let k = j; while (s[k] === " ") k++;
+              if (s[k] === "{") { const [inner, nj] = readGroup(s, k); flush(); out += convert(inner, st); i = nj; continue; }
+              i = j; continue;
+            }
+            i += 1; continue;
+          }
+          if (c === "{") { const [inner, nj] = readGroup(s, i); flush(); out += convert(inner, st); i = nj; continue; }
+          if (c === "}") { i++; continue; }
+          if (c === "~") { buf += " "; i++; continue; }
+          if (c === "\n") { let k = i + 1, nl = 1; while (k < s.length && (s[k] === " " || s[k] === "\t" || s[k] === "\n")) { if (s[k] === "\n") nl++; k++; } flush(); out += nl >= 2 ? '<div style="height:8px"></div>' : " "; i = k; continue; }
+          buf += c; i++;
+        }
+        flush();
+        return out;
+      }
+      function renderList(body, env, st) {
+        const parts = body.split(/\\item\b/), items = [];
+        for (let p = 1; p < parts.length; p++) items.push(`<li>${convert(parts[p], st)}</li>`);
+        return `<${env === "enumerate" ? "ol" : "ul"}>${items.join("")}</${env === "enumerate" ? "ol" : "ul"}>`;
+      }
+      function renderLatex(el, latex) {
+        const st = { err: null };
+        const hasDelim = /\$|\\\[|\\\(/.test(latex);
+        const hasTextMode = /\\begin\{(itemize|enumerate)\}/.test(latex) || /\\(noindent|textbf|textit|emph|section|item)\b/.test(latex);
+        if (!hasDelim && !hasTextMode) {
+          const blocks = latex.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+          el.innerHTML = blocks.map((b) => renderMath(b, true, st)).join('<div style="height:6px"></div>');
+        } else {
+          el.innerHTML = convert(latex, st);
+        }
+        return st.err;
       }
 
       function renderSummary() {
