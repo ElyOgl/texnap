@@ -8,7 +8,7 @@
 //! reasoning and message items, which is exactly the trap that silently
 //! truncated our Gemini transcriptions (see `gemini.rs`).
 
-use super::{OcrError, PROMPT};
+use super::OcrError;
 use serde::{Deserialize, Serialize};
 
 const MAX_TOKENS: u32 = 4096;
@@ -113,6 +113,7 @@ fn error_message(bytes: &[u8]) -> String {
 pub async fn call(
     endpoint: &Endpoint,
     image_data_url: &str,
+    prompt: &str,
     api_key: &str,
 ) -> Result<String, OcrError> {
     let body = ChatRequest {
@@ -130,7 +131,7 @@ pub async fn call(
                     },
                 },
                 Content::Text {
-                    text: PROMPT.to_string(),
+                    text: prompt.to_string(),
                 },
             ],
         }],

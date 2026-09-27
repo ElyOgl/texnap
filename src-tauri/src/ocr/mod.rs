@@ -80,14 +80,52 @@ pub async fn transcribe_to_latex(
     api_key: &str,
 ) -> Result<String, OcrError> {
     match provider {
-        Provider::Anthropic => anthropic::call(image_data_url, api_key).await,
-        Provider::Gemini => gemini::call(image_data_url, api_key).await,
+        Provider::Anthropic => anthropic::call(image_data_url, PROMPT, api_key).await,
+        Provider::Gemini => gemini::call(image_data_url, PROMPT, api_key).await,
         Provider::SimpleTex => simpletex::call(image_data_url, api_key).await,
         Provider::OpenRouter => {
-            openai_compat::call(&openai_compat::OPENROUTER, image_data_url, api_key).await
+            openai_compat::call(&openai_compat::OPENROUTER, image_data_url, PROMPT, api_key).await
         }
         Provider::OpenAi => {
-            openai_compat::call(&openai_compat::OPENAI, image_data_url, api_key).await
+            openai_compat::call(&openai_compat::OPENAI, image_data_url, PROMPT, api_key).await
         }
+    }
+}
+
+fn verify_prompt(latex: &str) -> String {
+    format!(
+        "You are checking a LaTeX transcription against the source image. Candidate LaTeX:\n\n{latex}\n\n\
+Does this LaTeX faithfully reproduce the mathematics shown in the image? Ignore cosmetic differences \
+(spacing, equivalent commands). Reply with EXACTLY one line, starting with one of:\n\
+MATCH\n\
+MINOR — <the one thing to double-check>\n\
+MISMATCH — <what is actually wrong>\n\
+No other text, no code fences."
+    )
+}
+
+/// Second-pass accuracy check: shows the model the image and the produced LaTeX
+/// and asks whether they match. Returns the model's single-line verdict. Not
+/// supported by SimpleTex (OCR-only, no free-form prompt).
+pub async fn verify(
+    provider: Provider,
+    image_data_url: &str,
+    latex: &str,
+    api_key: &str,
+) -> Result<String, OcrError> {
+    let prompt = verify_prompt(latex);
+    match provider {
+        Provider::Anthropic => anthropic::call(image_data_url, &prompt, api_key).await,
+        Provider::Gemini => gemini::call(image_data_url, &prompt, api_key).await,
+        Provider::OpenRouter => {
+            openai_compat::call(&openai_compat::OPENROUTER, image_data_url, &prompt, api_key).await
+        }
+        Provider::OpenAi => {
+            openai_compat::call(&openai_compat::OPENAI, image_data_url, &prompt, api_key).await
+        }
+        Provider::SimpleTex => Err(OcrError::Api {
+            status: 0,
+            message: "SimpleTex is OCR-only and can't verify.".into(),
+        }),
     }
 }

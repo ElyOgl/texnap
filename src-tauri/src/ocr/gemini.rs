@@ -1,4 +1,4 @@
-use super::{parse_data_url, OcrError, PROMPT};
+use super::{parse_data_url, OcrError};
 use serde::{Deserialize, Serialize};
 
 // gemini-2.5-flash returned 404 "no longer available to new users" as of
@@ -99,7 +99,7 @@ struct ApiErrorDetail {
     message: String,
 }
 
-pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrError> {
+pub async fn call(image_data_url: &str, prompt: &str, api_key: &str) -> Result<String, OcrError> {
     let (mime_type, data) = parse_data_url(image_data_url)?;
 
     let body = GenerateContentRequest {
@@ -109,7 +109,7 @@ pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrErro
                     inline_data: InlineData { mime_type, data },
                 },
                 Part::Text {
-                    text: PROMPT.to_string(),
+                    text: prompt.to_string(),
                 },
             ],
         }],

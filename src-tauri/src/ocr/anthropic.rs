@@ -1,4 +1,4 @@
-use super::{parse_data_url, OcrError, PROMPT};
+use super::{parse_data_url, OcrError};
 use serde::{Deserialize, Serialize};
 
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
@@ -56,7 +56,7 @@ struct ApiErrorDetail {
     message: String,
 }
 
-pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrError> {
+pub async fn call(image_data_url: &str, prompt: &str, api_key: &str) -> Result<String, OcrError> {
     let (media_type, data) = parse_data_url(image_data_url)?;
 
     let body = MessagesRequest {
@@ -73,7 +73,7 @@ pub async fn call(image_data_url: &str, api_key: &str) -> Result<String, OcrErro
                     },
                 },
                 ContentBlock::Text {
-                    text: PROMPT.to_string(),
+                    text: prompt.to_string(),
                 },
             ],
         }],

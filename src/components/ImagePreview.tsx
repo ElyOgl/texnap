@@ -24,12 +24,20 @@ type Transcription = {
   fellBackFrom: string | null;
 };
 
+type Verdict = {
+  level: "match" | "minor" | "mismatch" | "unknown";
+  note: string;
+  providerLabel: string;
+};
+
 export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChange, onClear }: Props) {
   const { image, latex, provider, seconds } = session;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [fellBackFrom, setFellBackFrom] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
 
   // A new capture (or an undo/redo) is a different image — drop any transient
   // state tied to the previous one.
@@ -38,7 +46,14 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
     setCopied(false);
     setLoading(false);
     setFellBackFrom(null);
+    setVerifying(false);
+    setVerdict(null);
   }, [image.id]);
+
+  // Editing the LaTeX invalidates a prior verdict.
+  useEffect(() => {
+    setVerdict(null);
+  }, [latex]);
 
   const rendered = useMemo(() => (latex ? renderLatex(latex) : null), [latex]);
 
@@ -70,6 +85,23 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
     await writeText(latex);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  const verify = async () => {
+    if (!latex) return;
+    setVerifying(true);
+    setVerdict(null);
+    try {
+      const result = await invoke<Verdict>("ocr_verify", {
+        imageDataUrl: image.dataUrl,
+        latex,
+      });
+      setVerdict(result);
+    } catch (err) {
+      setVerdict({ level: "unknown", note: String(err), providerLabel: "" });
+    } finally {
+      setVerifying(false);
+    }
   };
 
   // ⏎ transcribe, ⌘C copy — deferring to native behaviour inside text fields.
@@ -196,6 +228,38 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 Copy LaTeX
                 <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘C</span>
               </button>
+            </div>
+
+            {/* Optional accuracy check: a second LLM pass comparing the render to
+                the source image. Off the critical path — user triggers it. */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void verify()}
+                disabled={verifying}
+                className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
+              >
+                {verifying ? "Checking…" : "Check accuracy"}
+              </button>
+              {verdict && (
+                <span
+                  className={`text-[11px] ${
+                    verdict.level === "match"
+                      ? "text-ok"
+                      : verdict.level === "mismatch"
+                        ? "text-red-400"
+                        : "text-amber-400/90"
+                  }`}
+                >
+                  {verdict.level === "match"
+                    ? "✓ looks faithful"
+                    : verdict.level === "minor"
+                      ? `~ check: ${verdict.note}`
+                      : verdict.level === "mismatch"
+                        ? `✗ ${verdict.note}`
+                        : verdict.note}
+                </span>
+              )}
             </div>
           </>
         )}

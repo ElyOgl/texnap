@@ -116,6 +116,54 @@ async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transc
     unreachable!("loop returns on the last provider")
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Verdict {
+    /// "match" | "minor" | "mismatch" | "unknown"
+    level: &'static str,
+    note: String,
+    provider_label: &'static str,
+}
+
+#[tauri::command]
+async fn ocr_verify(app: AppHandle, image_data_url: String, latex: String) -> Result<Verdict, String> {
+    // Verification needs a reasoning vision LLM — SimpleTex (OCR-only) can't do
+    // it, so pick the first non-SimpleTex provider that has a key (active first).
+    let (provider, key) = config::fallback_chain(&app)
+        .into_iter()
+        .find(|(p, _)| *p != provider::Provider::SimpleTex)
+        .ok_or_else(|| "No LLM provider configured for verification (SimpleTex can't verify).".to_string())?;
+
+    let raw = ocr::verify(provider, &image_data_url, &latex, &key)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let line = raw.trim().lines().next().unwrap_or("").trim();
+    let upper = line.to_ascii_uppercase();
+    let (level, note) = if upper.starts_with("MATCH") {
+        ("match", String::new())
+    } else if upper.starts_with("MINOR") {
+        ("minor", strip_prefix_note(line))
+    } else if upper.starts_with("MISMATCH") {
+        ("mismatch", strip_prefix_note(line))
+    } else {
+        ("unknown", line.to_string())
+    };
+
+    Ok(Verdict {
+        level,
+        note,
+        provider_label: provider.info().label,
+    })
+}
+
+// Drops the "MINOR —"/"MISMATCH —" prefix, keeping the explanation.
+fn strip_prefix_note(line: &str) -> String {
+    line.split_once(['—', '-', ':'])
+        .map(|(_, rest)| rest.trim().to_string())
+        .unwrap_or_default()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Dev convenience only: searches upward from CWD, so a repo-root .env is
@@ -175,7 +223,8 @@ pub fn run() {
             history::add_history_entry,
             history::delete_history_entry,
             history::clear_history,
-            ocr_transcribe
+            ocr_transcribe,
+            ocr_verify
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
