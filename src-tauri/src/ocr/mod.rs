@@ -30,6 +30,21 @@ pub enum OcrError {
     UnparseableResponse(String),
 }
 
+impl OcrError {
+    /// Whether falling back to another provider could plausibly succeed: quota
+    /// (429), provider overload (Anthropic's 529), any 5xx, and network
+    /// failures. NOT a bad key (401/403) or a bad request (400) or a malformed
+    /// image — those would fail identically everywhere, and a bad key is
+    /// something the user should see, not have silently masked.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            OcrError::Network(_) => true,
+            OcrError::Api { status, .. } => *status == 429 || *status == 529 || *status >= 500,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for OcrError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

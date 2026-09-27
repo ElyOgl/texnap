@@ -18,6 +18,7 @@ type Props = {
 type Transcription = {
   latex: string;
   providerLabel: string;
+  fellBackFrom: string | null;
 };
 
 export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClear }: Props) {
@@ -25,6 +26,7 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [fellBackFrom, setFellBackFrom] = useState<string | null>(null);
 
   // A new capture (or an undo/redo) is a different image — drop any transient
   // state tied to the previous one.
@@ -32,6 +34,7 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
     setError(null);
     setCopied(false);
     setLoading(false);
+    setFellBackFrom(null);
   }, [image.id]);
 
   const rendered = useMemo(() => (latex ? renderLatex(latex) : null), [latex]);
@@ -45,6 +48,7 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
       const result = await invoke<Transcription>("ocr_transcribe", {
         imageDataUrl: image.dataUrl,
       });
+      setFellBackFrom(result.fellBackFrom);
       onResult(
         startedForImage,
         result.latex,
@@ -160,6 +164,11 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
               <span className="text-[11px] text-ink-3">
                 {copied ? (
                   <span className="text-ok">Copied to clipboard</span>
+                ) : fellBackFrom ? (
+                  <span className="text-amber-400/90">
+                    {fellBackFrom} unavailable — answered by {provider}
+                    {seconds !== null && ` · ${seconds.toFixed(1)}s`}
+                  </span>
                 ) : (
                   <>
                     via {provider}

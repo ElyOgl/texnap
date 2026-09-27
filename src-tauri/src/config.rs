@@ -64,12 +64,25 @@ fn key_for(stored: &StoredConfig, provider: Provider) -> Option<String> {
         })
 }
 
-/// Used by the `ocr_transcribe` command — the key never round-trips through
-/// JS beyond the one time it's saved.
-pub fn resolve_active_provider_and_key(app: &AppHandle) -> Option<(Provider, String)> {
+/// Ordered (provider, key) list to try: the active provider first, then every
+/// other provider that has a key, in `Provider::ALL` order. Lets the OCR
+/// command fall through to a working provider when the active one is out of
+/// quota — relevant now that free tiers are in play.
+pub fn fallback_chain(app: &AppHandle) -> Vec<(Provider, String)> {
     let stored = read_stored(app);
-    let provider = active_provider(&stored);
-    key_for(&stored, provider).map(|key| (provider, key))
+    let active = active_provider(&stored);
+    let mut chain = Vec::new();
+    if let Some(key) = key_for(&stored, active) {
+        chain.push((active, key));
+    }
+    for provider in Provider::ALL {
+        if provider != active {
+            if let Some(key) = key_for(&stored, provider) {
+                chain.push((provider, key));
+            }
+        }
+    }
+    chain
 }
 
 #[derive(Serialize)]

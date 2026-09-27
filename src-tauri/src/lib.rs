@@ -12,22 +12,38 @@ use tauri::AppHandle;
 #[serde(rename_all = "camelCase")]
 struct Transcription {
     latex: String,
-    /// With five providers, knowing which one produced a given result is what
-    /// makes the quality difference between them actionable.
+    /// Which provider actually produced this — with five providers and
+    /// fallback, the UI shows what answered.
     provider_label: &'static str,
+    /// Set when the originally-active provider failed and a fallback answered,
+    /// so the UI can say "X was unavailable — answered by <provider_label>".
+    fell_back_from: Option<&'static str>,
 }
 
 #[tauri::command]
 async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transcription, String> {
-    let (provider, api_key) = config::resolve_active_provider_and_key(&app)
-        .ok_or_else(|| ocr::OcrError::MissingApiKey.to_string())?;
-    let latex = ocr::transcribe_to_latex(provider, &image_data_url, &api_key)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(Transcription {
-        latex,
-        provider_label: provider.info().label,
-    })
+    let chain = config::fallback_chain(&app);
+    if chain.is_empty() {
+        return Err(ocr::OcrError::MissingApiKey.to_string());
+    }
+    let last = chain.len() - 1;
+    for (idx, (provider, api_key)) in chain.iter().enumerate() {
+        match ocr::transcribe_to_latex(*provider, &image_data_url, api_key).await {
+            Ok(latex) => {
+                return Ok(Transcription {
+                    latex,
+                    provider_label: provider.info().label,
+                    // chain[0] is the originally-active provider; if we're past
+                    // it, we fell back from there.
+                    fell_back_from: (idx > 0).then(|| chain[0].0.info().label),
+                });
+            }
+            // Only fall through on a retryable failure with a provider left to try.
+            Err(e) if idx < last && e.is_retryable() => continue,
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    unreachable!("loop returns on the last provider")
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
