@@ -13,11 +13,17 @@ use std::collections::HashMap;
 use std::fs;
 use tauri::{AppHandle, Manager};
 
+/// Global capture shortcut, macOS-default. Ctrl+Cmd+M is unused by macOS and
+/// is what Mathpix Snip uses, so it's familiar and collision-free; "M" for math.
+pub const DEFAULT_SHORTCUT: &str = "Ctrl+Cmd+M";
+
 #[derive(Serialize, Deserialize, Default)]
 struct StoredConfig {
     provider: Option<String>,
     #[serde(default)]
     keys: HashMap<String, String>,
+    #[serde(default)]
+    shortcut: Option<String>,
 }
 
 fn config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -83,6 +89,25 @@ pub fn fallback_chain(app: &AppHandle) -> Vec<(Provider, String)> {
         }
     }
     chain
+}
+
+/// The active global capture shortcut (stored, or the default).
+pub fn current_shortcut(app: &AppHandle) -> String {
+    read_stored(app)
+        .shortcut
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_SHORTCUT.to_string())
+}
+
+pub fn persist_shortcut(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+    let mut stored = read_stored(app);
+    stored.shortcut = Some(shortcut.to_string());
+    write_stored(app, &stored)
+}
+
+#[tauri::command]
+pub fn get_shortcut(app: AppHandle) -> String {
+    current_shortcut(&app)
 }
 
 #[derive(Serialize)]

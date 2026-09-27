@@ -5,6 +5,7 @@ import { renderLatex } from "../lib/latex";
 import { isEditableTarget } from "../lib/dom";
 import type { Session } from "../lib/session";
 import { HintBar } from "./ui";
+import { WanderingEyes } from "./WanderingEyes";
 import "katex/dist/katex.min.css";
 
 type Props = {
@@ -103,21 +104,24 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
           </div>
         </div>
 
-        {!latex && !error && (
+        {loading && (
+          <div className="flex justify-center py-6">
+            <WanderingEyes label="Transcribing…" />
+          </div>
+        )}
+
+        {!loading && !latex && !error && (
           <button
             type="button"
             onClick={() => void transcribe()}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-60"
+            className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-ink hover:brightness-110"
           >
-            {loading ? "Transcribing…" : "Transcribe to LaTeX"}
-            {!loading && (
-              <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10.5px]">⏎</span>
-            )}
+            Transcribe to LaTeX
+            <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10.5px]">⏎</span>
           </button>
         )}
 
-        {error && (
+        {!loading && error && (
           <div className="rounded-lg border border-red-900 bg-red-950/60 px-3 py-2 text-[12px] text-red-300">
             {error}
             <button
@@ -129,7 +133,7 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
           </div>
         )}
 
-        {latex && (
+        {!loading && latex && (
           <>
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-ink-3">

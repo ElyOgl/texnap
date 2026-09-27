@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { ApiKeySetup } from "./components/ApiKeySetup";
 import { CaptureZone } from "./components/CaptureZone";
 import { ImagePreview } from "./components/ImagePreview";
@@ -41,6 +42,22 @@ function App() {
     dispatch({ type: "capture", image: img });
   }, []);
   const handleError = useCallback((msg: string) => setError(msg), []);
+
+  // Region snips triggered by the global shortcut arrive as a data URL from
+  // Rust — feed them into the same capture pipeline and leave the settings view.
+  useEffect(() => {
+    const unlisten = listen<string>("capture-region", (event) => {
+      setShowSettings(false);
+      handleCapture({
+        id: crypto.randomUUID(),
+        dataUrl: event.payload,
+        fileName: `snip-${Date.now()}.png`,
+      });
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [handleCapture]);
 
   const captureEnabled = configured === true && !showSettings;
   const { isDragging, pickFile } = useImageCapture(handleCapture, handleError, captureEnabled);

@@ -5,8 +5,47 @@ pub mod capture;
 mod config;
 pub mod ocr;
 pub mod provider;
+mod snip;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+// Registers `accel` as the global capture shortcut, replacing any previous one.
+// On press it runs the region capture off the main thread (screencapture blocks
+// while the user drags a selection), then shows the window and emits the image
+// to the frontend, which feeds it into the normal capture pipeline.
+fn register_shortcut(app: &AppHandle, accel: &str) -> Result<(), String> {
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    gs.on_shortcut(accel, |app, _shortcut, event| {
+        if event.state() != ShortcutState::Pressed {
+            return;
+        }
+        let app = app.clone();
+        std::thread::spawn(move || {
+            if let Some(data_url) = snip::capture_region_to_data_url() {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+                let _ = app.emit("capture-region", data_url);
+            }
+        });
+    })
+    .map_err(|e| format!("Couldn't register the shortcut \"{accel}\": {e}"))
+}
+
+#[tauri::command]
+fn set_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
+    let previous = config::current_shortcut(&app);
+    if let Err(e) = register_shortcut(&app, &shortcut) {
+        // Registering unregistered the old one first; restore it so the user
+        // isn't left with no working shortcut after a bad entry.
+        let _ = register_shortcut(&app, &previous);
+        return Err(e);
+    }
+    config::persist_shortcut(&app, &shortcut)
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,15 +97,26 @@ pub fn run() {
         // it on the next launch (falls back to the tauri.conf.json defaults on
         // first run).
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .setup(|app| {
+            // Register the stored (or default) global capture shortcut at start.
+            let accel = config::current_shortcut(app.handle());
+            if let Err(e) = register_shortcut(app.handle(), &accel) {
+                eprintln!("[texnap] {e}");
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             capture::read_image_as_base64,
             config::get_config_status,
             config::list_providers,
             config::save_provider_key,
             config::set_active_provider,
+            config::get_shortcut,
+            set_shortcut,
             ocr_transcribe
         ])
         .run(tauri::generate_context!())
