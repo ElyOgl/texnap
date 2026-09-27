@@ -7,32 +7,56 @@ pub mod ocr;
 pub mod provider;
 mod snip;
 
+use std::str::FromStr;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+
+// Parse an accelerator like "Ctrl+Cmd+M" into a Shortcut ourselves, rather than
+// relying on the plugin's string parser (whose key grammar is finicky — single
+// letters vs "KeyM"). We normalize single letters/digits to Code names and let
+// `Code::from_str` do the rest.
+fn parse_shortcut(accel: &str) -> Option<Shortcut> {
+    let mut mods = Modifiers::empty();
+    let mut code: Option<Code> = None;
+    for raw in accel.split('+') {
+        let token = raw.trim();
+        match token.to_ascii_lowercase().as_str() {
+            "" => {}
+            "cmd" | "command" | "super" | "meta" => mods |= Modifiers::SUPER,
+            "ctrl" | "control" => mods |= Modifiers::CONTROL,
+            "alt" | "option" => mods |= Modifiers::ALT,
+            "shift" => mods |= Modifiers::SHIFT,
+            _ => code = key_to_code(token),
+        }
+    }
+    Some(Shortcut::new(Some(mods), code?))
+}
+
+fn key_to_code(k: &str) -> Option<Code> {
+    let up = k.to_ascii_uppercase();
+    let name = if up.len() == 1 && up.as_bytes()[0].is_ascii_alphabetic() {
+        format!("Key{up}")
+    } else if up.len() == 1 && up.as_bytes()[0].is_ascii_digit() {
+        format!("Digit{up}")
+    } else if up == "SPACE" {
+        "Space".to_string()
+    } else {
+        up // F1..F12, or an already-qualified Code name
+    };
+    Code::from_str(&name).ok()
+}
 
 // Registers `accel` as the global capture shortcut, replacing any previous one.
-// On press it runs the region capture off the main thread (screencapture blocks
-// while the user drags a selection), then shows the window and emits the image
-// to the frontend, which feeds it into the normal capture pipeline.
+// The actual capture is done by the plugin's global handler (set in `run`); this
+// only manages which accelerator is bound.
 fn register_shortcut(app: &AppHandle, accel: &str) -> Result<(), String> {
+    let shortcut = parse_shortcut(accel).ok_or_else(|| format!("Invalid shortcut: {accel}"))?;
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    gs.on_shortcut(accel, |app, _shortcut, event| {
-        if event.state() != ShortcutState::Pressed {
-            return;
-        }
-        let app = app.clone();
-        std::thread::spawn(move || {
-            if let Some(data_url) = snip::capture_region_to_data_url() {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-                let _ = app.emit("capture-region", data_url);
-            }
-        });
-    })
-    .map_err(|e| format!("Couldn't register the shortcut \"{accel}\": {e}"))
+    gs.register(shortcut)
+        .map_err(|e| format!("Couldn't register the shortcut \"{accel}\": {e}"))?;
+    eprintln!("[texnap] global shortcut registered: {accel}");
+    Ok(())
 }
 
 #[tauri::command]
@@ -97,7 +121,31 @@ pub fn run() {
         // it on the next launch (falls back to the tauri.conf.json defaults on
         // first run).
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            // One global handler for whatever shortcut is currently registered:
+            // on press, run the region capture off the main thread (screencapture
+            // blocks while the user drags), then show the window and hand the
+            // image to the frontend, which auto-transcribes it.
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    let app = app.clone();
+                    std::thread::spawn(move || {
+                        eprintln!("[texnap] capture shortcut fired");
+                        if let Some(data_url) = snip::capture_region_to_data_url() {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                            let _ = app.emit("capture-region", data_url);
+                        }
+                    });
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())

@@ -17,6 +17,7 @@ function App() {
   const [activeProviderLabel, setActiveProviderLabel] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoRunId, setAutoRunId] = useState<string | null>(null);
   const [history, dispatch] = useReducer(historyReducer, initialHistory);
   const session = history.present;
 
@@ -48,11 +49,10 @@ function App() {
   useEffect(() => {
     const unlisten = listen<string>("capture-region", (event) => {
       setShowSettings(false);
-      handleCapture({
-        id: crypto.randomUUID(),
-        dataUrl: event.payload,
-        fileName: `snip-${Date.now()}.png`,
-      });
+      const id = crypto.randomUUID();
+      // Snips auto-transcribe (unlike paste/drop, which wait for ⏎).
+      setAutoRunId(id);
+      handleCapture({ id, dataUrl: event.payload, fileName: `snip-${Date.now()}.png` });
     });
     return () => {
       void unlisten.then((fn) => fn());
@@ -124,6 +124,7 @@ function App() {
           <ImagePreview
             session={session}
             canUndo={history.past.length > 0}
+            autoRun={session.image.id === autoRunId}
             onResult={(imageId, latex, provider, seconds) =>
               dispatch({ type: "result", imageId, latex, provider, seconds })
             }

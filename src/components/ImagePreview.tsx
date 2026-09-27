@@ -11,6 +11,8 @@ import "katex/dist/katex.min.css";
 type Props = {
   session: Session;
   canUndo: boolean;
+  /** Auto-start transcription (snips do this; paste/drop wait for ⏎). */
+  autoRun: boolean;
   onResult: (imageId: string, latex: string, provider: string, seconds: number) => void;
   onLatexChange: (latex: string) => void;
   onClear: () => void;
@@ -22,7 +24,7 @@ type Transcription = {
   fellBackFrom: string | null;
 };
 
-export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClear }: Props) {
+export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChange, onClear }: Props) {
   const { image, latex, provider, seconds } = session;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -84,6 +86,12 @@ export function ImagePreview({ session, canUndo, onResult, onLatexChange, onClea
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  // Snips auto-transcribe as soon as the image lands.
+  useEffect(() => {
+    if (autoRun && !latex && !loading) void transcribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, image.id]);
 
   return (
     <div className="flex flex-1 flex-col">
