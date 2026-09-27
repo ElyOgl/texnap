@@ -21,6 +21,7 @@ export type HistoryAction =
   | { type: "capture"; image: CapturedImage }
   | { type: "result"; imageId: string; latex: string; provider: string; seconds: number }
   | { type: "editLatex"; latex: string }
+  | { type: "load"; session: Session }
   | { type: "clear" }
   | { type: "undo" }
   | { type: "redo" };
@@ -63,6 +64,14 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
     case "editLatex": {
       if (!state.present) return state;
       return { ...state, present: { ...state.present, latex: action.latex } };
+    }
+    case "load": {
+      // Restoring a history entry — a new boundary, like a fresh capture.
+      return {
+        past: state.present ? [...state.past, state.present] : state.past,
+        present: action.session,
+        future: [],
+      };
     }
     case "clear": {
       if (!state.present) return state;

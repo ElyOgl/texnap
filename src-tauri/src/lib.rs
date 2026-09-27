@@ -3,6 +3,7 @@
 // reimplementation, not the app.
 pub mod capture;
 mod config;
+mod history;
 pub mod ocr;
 pub mod provider;
 mod snip;
@@ -170,6 +171,10 @@ pub fn run() {
             config::set_active_provider,
             config::get_shortcut,
             set_shortcut,
+            history::get_history,
+            history::add_history_entry,
+            history::delete_history_entry,
+            history::clear_history,
             ocr_transcribe
         ])
         .run(tauri::generate_context!())

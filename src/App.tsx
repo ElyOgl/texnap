@@ -4,10 +4,12 @@ import { listen } from "@tauri-apps/api/event";
 import { ApiKeySetup } from "./components/ApiKeySetup";
 import { CaptureZone } from "./components/CaptureZone";
 import { ImagePreview } from "./components/ImagePreview";
+import { HistoryPanel } from "./components/HistoryPanel";
 import { HintBar } from "./components/ui";
 import { useImageCapture } from "./lib/useImageCapture";
 import { isEditableTarget } from "./lib/dom";
 import { historyReducer, initialHistory } from "./lib/session";
+import { type HistoryEntry, makeThumbnail } from "./lib/history";
 import type { CapturedImage } from "./lib/image";
 import type { ConfigStatus, ProviderInfo } from "./lib/providers";
 import "./App.css";
@@ -16,6 +18,7 @@ function App() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [activeProviderLabel, setActiveProviderLabel] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoRunId, setAutoRunId] = useState<string | null>(null);
   const [history, dispatch] = useReducer(historyReducer, initialHistory);
@@ -71,14 +74,38 @@ function App() {
         setShowSettings(true);
         return;
       }
-      if (e.metaKey && e.key.toLowerCase() === "z" && !showSettings && !isEditableTarget(e.target)) {
+      if (e.key === "Escape" && showHistory) {
+        e.preventDefault();
+        setShowHistory(false);
+        return;
+      }
+      if (
+        e.metaKey &&
+        e.key.toLowerCase() === "z" &&
+        !showSettings &&
+        !showHistory &&
+        !isEditableTarget(e.target)
+      ) {
         e.preventDefault();
         dispatch({ type: e.shiftKey ? "redo" : "undo" });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [configured, showSettings]);
+  }, [configured, showSettings, showHistory]);
+
+  const openHistoryEntry = (entry: HistoryEntry) => {
+    dispatch({
+      type: "load",
+      session: {
+        image: { id: crypto.randomUUID(), dataUrl: entry.thumbnail, fileName: "from-history.png" },
+        latex: entry.latex,
+        provider: entry.provider,
+        seconds: null,
+      },
+    });
+    setShowHistory(false);
+  };
 
   const settingsDone = () => {
     setShowSettings(false);
@@ -92,17 +119,30 @@ function App() {
           <span className="h-1.5 w-1.5 rounded-full bg-ok shadow-[0_0_0_3px_rgba(70,211,138,0.16)]" />
           {activeProviderLabel ?? "…"}
         </span>
-        {configured && !showSettings && (
-          <button
-            onClick={() => setShowSettings(true)}
-            title="OCR provider settings (⌘,)"
-            className="text-ink-3 hover:text-ink-2"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-            </svg>
-          </button>
+        {configured && !showSettings && !showHistory && (
+          <>
+            <button
+              onClick={() => setShowHistory(true)}
+              title="History"
+              className="text-ink-3 hover:text-ink-2"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 3v5h5" />
+                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+                <path d="M12 7v5l4 2" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              title="OCR provider settings (⌘,)"
+              className="text-ink-3 hover:text-ink-2"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+            </button>
+          </>
         )}
       </header>
 
@@ -120,14 +160,24 @@ function App() {
             onDone={settingsDone}
             onCancel={configured ? () => setShowSettings(false) : undefined}
           />
+        ) : showHistory ? (
+          <HistoryPanel onOpen={openHistoryEntry} onClose={() => setShowHistory(false)} />
         ) : session ? (
           <ImagePreview
             session={session}
             canUndo={history.past.length > 0}
             autoRun={session.image.id === autoRunId}
-            onResult={(imageId, latex, provider, seconds) =>
-              dispatch({ type: "result", imageId, latex, provider, seconds })
-            }
+            onResult={(imageId, latex, provider, seconds) => {
+              dispatch({ type: "result", imageId, latex, provider, seconds });
+              // Save to history (a downscaled thumbnail keeps history.json small).
+              if (session && session.image.id === imageId) {
+                void makeThumbnail(session.image.dataUrl).then((thumbnail) =>
+                  invoke("add_history_entry", {
+                    entry: { id: crypto.randomUUID(), createdAt: Date.now(), latex, provider, thumbnail },
+                  }),
+                );
+              }
+            }}
             onLatexChange={(latex) => dispatch({ type: "editLatex", latex })}
             onClear={() => dispatch({ type: "clear" })}
           />
