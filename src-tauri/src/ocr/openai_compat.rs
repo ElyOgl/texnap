@@ -15,20 +15,35 @@ const MAX_TOKENS: u32 = 4096;
 
 pub struct Endpoint {
     pub url: &'static str,
-    pub model: &'static str,
+    /// Single model (OpenAI). Serialized as `model`.
+    pub model: Option<&'static str>,
+    /// Ordered model list (OpenRouter): tried in order, retired ids skipped.
+    /// Serialized as `models`.
+    pub models: Option<&'static [&'static str]>,
 }
 
 pub const OPENAI: Endpoint = Endpoint {
     url: "https://api.openai.com/v1/chat/completions",
-    model: "gpt-5.6-luna",
+    model: Some("gpt-5.6-luna"),
+    models: None,
 };
 
 pub const OPENROUTER: Endpoint = Endpoint {
     url: "https://openrouter.ai/api/v1/chat/completions",
-    // Auto-router restricted to free, image-capable models. Individual
-    // ":free" model ids get retired without notice, this one doesn't —
-    // verified 2026-09-24 that it advertises image input support.
-    model: "openrouter/free",
+    model: None,
+    // A curated list of free, genuinely vision-capable models, NOT the
+    // `openrouter/free` auto-router — the router happily routed OCR requests to
+    // a content-moderation model (nvidia/...content-safety) that replied
+    // "User Safety: safe" instead of transcribing (seen 2026-09-27). OpenRouter
+    // tries these in order and skips any that are unavailable/retired, so this
+    // survives model churn while never hitting a non-transcription model.
+    // Qwen VL leads (strong at OCR); Gemma 4 as fallbacks. If all 404, refresh
+    // from https://openrouter.ai/api/v1/models (filter :free + image input).
+    models: Some(&[
+        "qwen/qwen3.8-27b:free",
+        "google/gemma-4-31b-it:free",
+        "google/gemma-4-26b-a4b-it:free",
+    ]),
 };
 
 #[derive(Serialize)]
@@ -54,7 +69,10 @@ struct Message {
 
 #[derive(Serialize)]
 struct ChatRequest {
-    model: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    models: Option<&'static [&'static str]>,
     messages: Vec<Message>,
     max_tokens: u32,
 }
@@ -99,6 +117,7 @@ pub async fn call(
 ) -> Result<String, OcrError> {
     let body = ChatRequest {
         model: endpoint.model,
+        models: endpoint.models,
         max_tokens: MAX_TOKENS,
         messages: vec![Message {
             role: "user",
