@@ -4,6 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { renderLatex } from "../lib/latex";
 import { isEditableTarget } from "../lib/dom";
 import type { Session } from "../lib/session";
+import { TagEditor } from "./Tags";
 import { HintBar } from "./ui";
 import { WanderingEyes } from "./WanderingEyes";
 import "katex/dist/katex.min.css";
@@ -16,6 +17,10 @@ type Props = {
   onResult: (imageId: string, latex: string, provider: string, seconds: number) => void;
   onLatexChange: (latex: string) => void;
   onClear: () => void;
+  /** Tags on the saved library entry for this result (F1); undefined until it's
+      been saved (i.e. after a fresh transcription, not a reopened entry). */
+  entryTags?: string[];
+  onEntryTags?: (tags: string[]) => void;
 };
 
 type Transcription = {
@@ -42,7 +47,7 @@ function friendlyError(raw: string): string {
   return raw;
 }
 
-export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChange, onClear }: Props) {
+export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChange, onClear, entryTags, onEntryTags }: Props) {
   const { image, latex, provider, seconds } = session;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -241,6 +246,13 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘C</span>
               </button>
             </div>
+
+            {onEntryTags && (
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-[11px] text-ink-3">Tags</span>
+                <TagEditor tags={entryTags ?? []} onChange={onEntryTags} compact />
+              </div>
+            )}
 
             {/* Optional accuracy check: a second LLM pass comparing the render to
                 the source image. Off the critical path — user triggers it. */}

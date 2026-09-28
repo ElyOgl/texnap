@@ -4,6 +4,10 @@ export type HistoryEntry = {
   latex: string;
   provider: string;
   thumbnail: string;
+  /** Library tags (F1). Absent on entries saved before F1 → treat as []. */
+  tags?: string[];
+  /** Pinned entries sort first and survive the cap (F1). */
+  pinned?: boolean;
 };
 
 // Downscale a captured image to a small data URL for the history list, so

@@ -259,7 +259,9 @@ pub fn run() {
             history::get_history,
             history::add_history_entry,
             history::delete_history_entry,
-            history::clear_history,
+            history::set_entry_tags,
+            history::set_entry_pinned,
+            history::clear_uncurated,
             ocr_transcribe,
             ocr_verify
         ])

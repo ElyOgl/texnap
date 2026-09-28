@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ApiKeySetup } from "./components/ApiKeySetup";
 import { CaptureZone } from "./components/CaptureZone";
 import { ImagePreview } from "./components/ImagePreview";
-import { HistoryPanel } from "./components/HistoryPanel";
+import { LibraryPanel } from "./components/LibraryPanel";
 import { HintBar } from "./components/ui";
 import { useImageCapture } from "./lib/useImageCapture";
 import { isEditableTarget } from "./lib/dom";
@@ -23,6 +23,10 @@ function App() {
   const [autoRunId, setAutoRunId] = useState<string | null>(null);
   const [history, dispatch] = useReducer(historyReducer, initialHistory);
   const session = history.present;
+  // The library entry saved for the current result, so it can be tagged right
+  // from the result view (F1). Tied to the image it came from — cleared on a
+  // new capture so tags never leak to the next formula.
+  const [savedEntry, setSavedEntry] = useState<{ id: string; imageId: string; tags: string[] } | null>(null);
 
   const refresh = useCallback(async () => {
     const [status, list] = await Promise.all([
@@ -43,6 +47,7 @@ function App() {
   // undo stack so ⌘Z brings it (and its LaTeX) back.
   const handleCapture = useCallback((img: CapturedImage) => {
     setError(null);
+    setSavedEntry(null);
     dispatch({ type: "capture", image: img });
   }, []);
   const handleError = useCallback((msg: string) => setError(msg), []);
@@ -123,13 +128,11 @@ function App() {
           <>
             <button
               onClick={() => setShowHistory(true)}
-              title="History"
+              title="Library"
               className="text-ink-3 hover:text-ink-2"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 3v5h5" />
-                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
-                <path d="M12 7v5l4 2" />
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 4h11a1 1 0 0 1 1 1v15l-6-3.5L6 20V4z" />
               </svg>
             </button>
             <button
@@ -161,21 +164,33 @@ function App() {
             onCancel={configured ? () => setShowSettings(false) : undefined}
           />
         ) : showHistory ? (
-          <HistoryPanel onOpen={openHistoryEntry} onClose={() => setShowHistory(false)} />
+          <LibraryPanel onOpen={openHistoryEntry} onClose={() => setShowHistory(false)} />
         ) : session ? (
           <ImagePreview
             session={session}
             canUndo={history.past.length > 0}
             autoRun={session.image.id === autoRunId}
+            entryTags={savedEntry?.imageId === session.image.id ? savedEntry.tags : undefined}
+            onEntryTags={
+              savedEntry?.imageId === session.image.id
+                ? (tags) => {
+                    setSavedEntry((prev) => (prev ? { ...prev, tags } : prev));
+                    void invoke("set_entry_tags", { id: savedEntry.id, tags });
+                  }
+                : undefined
+            }
             onResult={(imageId, latex, provider, seconds) => {
               dispatch({ type: "result", imageId, latex, provider, seconds });
-              // Save to history (a downscaled thumbnail keeps history.json small).
+              // Save to the library (a downscaled thumbnail keeps history.json
+              // small). Keep the new entry's id so the result view can tag it.
               if (session && session.image.id === imageId) {
-                void makeThumbnail(session.image.dataUrl).then((thumbnail) =>
-                  invoke("add_history_entry", {
-                    entry: { id: crypto.randomUUID(), createdAt: Date.now(), latex, provider, thumbnail },
-                  }),
-                );
+                const id = crypto.randomUUID();
+                void makeThumbnail(session.image.dataUrl).then(async (thumbnail) => {
+                  await invoke("add_history_entry", {
+                    entry: { id, createdAt: Date.now(), latex, provider, thumbnail, tags: [], pinned: false },
+                  });
+                  setSavedEntry({ id, imageId, tags: [] });
+                });
               }
             }}
             onLatexChange={(latex) => dispatch({ type: "editLatex", latex })}
