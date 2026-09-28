@@ -1,0 +1,19 @@
+[package]
+name = "texnap-cli"
+version = "0.3.0"
+description = "texnap on the command line: an image of math in, LaTeX out."
+authors = ["Elyo"]
+edition = "2021"
+
+# The installed binary is `texnap` (so `cargo install --git … texnap-cli` gives
+# you a `texnap` command), even though the crate is `texnap-cli`.
+[[bin]]
+name = "texnap"
+path = "src/main.rs"
+
+[dependencies]
+texnap-core = { path = "../core" }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+base64 = "0.22"
+serde_json = "1"

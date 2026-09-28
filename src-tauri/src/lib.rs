@@ -1,11 +1,11 @@
-// Public so the eval runner (`examples/eval.rs`) can drive the *same* code
-// path the app uses. An eval that reimplements the API calls measures a
-// reimplementation, not the app.
-pub mod capture;
+// The OCR engine lives in `texnap-core`, shared with the CLI. Re-export the
+// pieces under their original paths (`texnap_lib::ocr`, `::provider`,
+// `::capture`) so the eval runner (`examples/eval.rs`) — which must drive the
+// *same* code path the app uses — keeps working unchanged.
+pub use texnap_core::{capture, ocr, provider};
+
 mod config;
 mod history;
-pub mod ocr;
-pub mod provider;
 mod snip;
 
 use std::str::FromStr;
@@ -64,6 +64,13 @@ fn register_shortcut(app: &AppHandle, accel: &str) -> Result<(), String> {
     let _ = gs.unregister_all();
     gs.register(shortcut)
         .map_err(|e| format!("Couldn't register the shortcut \"{accel}\": {e}"))
+}
+
+// Thin Tauri wrapper over the pure `texnap_core::capture` — the drop/picker
+// path invokes this; the actual file→data-URL work is shared with the CLI.
+#[tauri::command]
+fn read_image_as_base64(path: String) -> Result<capture::CapturedImage, String> {
+    capture::read_image_as_base64(path)
 }
 
 #[tauri::command]
@@ -242,7 +249,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            capture::read_image_as_base64,
+            read_image_as_base64,
             config::get_config_status,
             config::list_providers,
             config::save_provider_key,

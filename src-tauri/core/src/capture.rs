@@ -2,6 +2,9 @@
 //! something the frontend can preview and, later, send to the OCR command.
 //! Clipboard-paste doesn't go through here — the browser already hands the
 //! frontend image bytes directly, no file path involved.
+//!
+//! Pure (no Tauri): the app wraps this in a `#[tauri::command]`, the CLI and the
+//! eval runner call it directly. The file→data-URL step is identical everywhere.
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Serialize;
@@ -26,7 +29,6 @@ fn mime_for_extension(ext: &str) -> Option<&'static str> {
     }
 }
 
-#[tauri::command]
 pub fn read_image_as_base64(path: String) -> Result<CapturedImage, String> {
     let p = Path::new(&path);
 

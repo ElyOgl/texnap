@@ -1,30 +1,19 @@
-//! P2a: which provider is active and where its key comes from. Resolution
-//! order per provider: (1) that provider's env var / repo-root `.env` (dev
-//! convenience — `dotenvy::dotenv()` in `lib.rs` searches upward from the
-//! CWD); (2) `config.json` in the app's data dir (`~/Library/Application
-//! Support/fr.elyo.texnap/` on macOS) — this is what the built `.dmg` uses.
+//! P2a: which provider is active and where its key comes from — the app's
+//! Tauri-bound half. The *rules* (resolution order, fallback ordering, the
+//! stored shape) live in `texnap_core::config`; this owns *where* the file is
+//! (Tauri's `app_data_dir()`), the read/write, and the `#[tauri::command]`s.
 //!
-//! Deliberately NOT using macOS Keychain: single-user local tool, nothing
-//! else on the machine reads this file. See `Trinity/TEXNAP/DECISIONS.md`.
+//! Resolution order per provider, unchanged: (1) that provider's env var /
+//! repo-root `.env` (dev convenience — `dotenvy::dotenv()` in `lib.rs` searches
+//! upward from the CWD); (2) `config.json` in the app's data dir
+//! (`~/Library/Application Support/fr.elyo.texnap/` on macOS) — what the built
+//! `.dmg` uses. Deliberately NOT macOS Keychain: single-user local tool. See
+//! `Trinity/TEXNAP/DECISIONS.md`.
 
 use crate::provider::{Provider, ProviderInfo};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use tauri::{AppHandle, Manager};
-
-/// Global capture shortcut, macOS-default. Ctrl+Cmd+M is unused by macOS and
-/// is what Mathpix Snip uses, so it's familiar and collision-free; "M" for math.
-pub const DEFAULT_SHORTCUT: &str = "Ctrl+Cmd+M";
-
-#[derive(Serialize, Deserialize, Default)]
-struct StoredConfig {
-    provider: Option<String>,
-    #[serde(default)]
-    keys: HashMap<String, String>,
-    #[serde(default)]
-    shortcut: Option<String>,
-}
+use texnap_core::config::{self as core_config, StoredConfig, DEFAULT_SHORTCUT};
 
 fn config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app
@@ -49,46 +38,11 @@ fn write_stored(app: &AppHandle, config: &StoredConfig) -> Result<(), String> {
     fs::write(&path, json).map_err(|e| format!("Couldn't write {}: {e}", path.display()))
 }
 
-fn active_provider(stored: &StoredConfig) -> Provider {
-    stored
-        .provider
-        .as_deref()
-        .and_then(Provider::from_str)
-        .unwrap_or(Provider::Gemini) // default to the free one
-}
-
-fn key_for(stored: &StoredConfig, provider: Provider) -> Option<String> {
-    std::env::var(provider.env_var_name())
-        .ok()
-        .filter(|k| !k.trim().is_empty())
-        .or_else(|| {
-            stored
-                .keys
-                .get(provider.as_str())
-                .filter(|k| !k.trim().is_empty())
-                .cloned()
-        })
-}
-
-/// Ordered (provider, key) list to try: the active provider first, then every
-/// other provider that has a key, in `Provider::ALL` order. Lets the OCR
-/// command fall through to a working provider when the active one is out of
-/// quota — relevant now that free tiers are in play.
+/// Ordered (provider, key) list to try — active first, then others with a key.
+/// The ordering rule is `texnap_core::config::fallback_chain`; this just feeds
+/// it the app's stored config.
 pub fn fallback_chain(app: &AppHandle) -> Vec<(Provider, String)> {
-    let stored = read_stored(app);
-    let active = active_provider(&stored);
-    let mut chain = Vec::new();
-    if let Some(key) = key_for(&stored, active) {
-        chain.push((active, key));
-    }
-    for provider in Provider::ALL {
-        if provider != active {
-            if let Some(key) = key_for(&stored, provider) {
-                chain.push((provider, key));
-            }
-        }
-    }
-    chain
+    core_config::fallback_chain(&read_stored(app))
 }
 
 /// The active global capture shortcut (stored, or the default).
@@ -110,7 +64,7 @@ pub fn get_shortcut(app: AppHandle) -> String {
     current_shortcut(&app)
 }
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigStatus {
     pub configured: bool,
@@ -121,13 +75,13 @@ pub struct ConfigStatus {
 #[tauri::command]
 pub fn get_config_status(app: AppHandle) -> ConfigStatus {
     let stored = read_stored(&app);
-    let provider = active_provider(&stored);
+    let provider = core_config::active_provider(&stored);
     ConfigStatus {
-        configured: key_for(&stored, provider).is_some(),
+        configured: core_config::key_for(&stored, provider).is_some(),
         active_provider: provider.as_str(),
         saved_providers: Provider::ALL
             .iter()
-            .filter(|p| key_for(&stored, **p).is_some())
+            .filter(|p| core_config::key_for(&stored, **p).is_some())
             .map(|p| p.as_str())
             .collect(),
     }

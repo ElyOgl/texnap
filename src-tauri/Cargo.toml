@@ -5,6 +5,15 @@ description = "A Tauri App"
 authors = ["Elyo"]
 edition = "2021"
 
+# This manifest is both the Tauri app package AND the Cargo workspace root, so
+# the app stays exactly where Tauri expects it (src-tauri/) while the shared
+# engine (core/) and the terminal tool (cli/) live beside it as members. The
+# app depends on core; the CLI depends on core only (no Tauri) — see
+# Trinity/TEXNAP/ROADMAP.md § Session CLI.
+[workspace]
+members = ["core", "cli"]
+resolver = "2"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
@@ -24,10 +33,12 @@ tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-global-shortcut = "2"
+# The OCR engine (providers, transcription, key-resolution rules) lives here,
+# shared with the CLI. The app keeps only its Tauri-bound glue.
+texnap-core = { path = "core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
 dotenvy = "0.15"
 
 

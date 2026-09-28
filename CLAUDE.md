@@ -27,7 +27,11 @@ v1 scope is **isolated formulas** (Mathpix-Snip style), not full mixed text+math
 
 - Code + repo: `/Users/elyo/Desktop/TRINITY/texnap/` — private `github.com/ElyOgl/texnap`, branch `main`.
   - `src/` — React/TS frontend (Vite).
-  - `src-tauri/src/` — Rust backend: `lib.rs` (window setup, command registration), `capture.rs` (file→base64 for drop/picker), `config.rs` (provider/key resolution + storage), `provider.rs` (the `Provider` enum), `ocr/` (one module per provider: `anthropic.rs`, `gemini.rs`, dispatched from `mod.rs`).
+  - `src-tauri/` — a **Cargo workspace** (root manifest is also the Tauri app package):
+    - `core/` — **`texnap-core`**, the Tauri-free OCR engine: `provider.rs` (the `Provider` enum), `ocr/` (one module per provider: `anthropic.rs`, `gemini.rs`, `openai_compat.rs`, `simpletex.rs`, dispatched from `mod.rs`), `capture.rs` (file→base64), `config.rs` (pure key-resolution rules + the stored `config.json` shape). Shared by the app and the CLI.
+    - `src/` — the **Tauri app**: `lib.rs` (window/shortcut setup, command registration, the `#[tauri::command]` wrappers over core), `config.rs` (Tauri `app_data_dir` path + read/write, delegating rules to core), `history.rs`, `snip.rs`.
+    - `cli/` — **`texnap-cli`**, a terminal binary (`texnap`) depending on core only (no Tauri). Keys resolve env-first (`TEXNAP_API_KEY`/`TEXNAP_PROVIDER`) then the app's `config.json`.
+  - `cargo test --workspace` runs all Rust tests; `cargo check -p texnap-core -p texnap-cli` is the fast non-Tauri check.
 - Docs: `/Users/elyo/Desktop/TRINITY/Trinity/TEXNAP/` — hub is `TEXNAP-Index.md`, live state in `STATUS.md`, roadmap/phases in `ROADMAP.md`, locked calls in `DECISIONS.md`. Never write texnap notes into another project's Trinity folder.
 
 ## Local dev

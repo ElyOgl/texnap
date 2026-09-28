@@ -1,0 +1,15 @@
+[package]
+name = "texnap-core"
+version = "0.3.0"
+description = "texnap's Tauri-free OCR engine: providers, transcription, verification, key resolution."
+authors = ["Elyo"]
+edition = "2021"
+
+[lib]
+name = "texnap_core"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
