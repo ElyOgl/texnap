@@ -26,11 +26,31 @@ secrets are shipped in the app.
 
 Download the latest `.dmg` from
 [Releases](https://github.com/ElyOgl/texnap/releases), open it, and drag
-**texnap** to Applications.
+**texnap** to Applications. Apple Silicon (M-series) only for now — an Intel /
+universal build comes with the signed release.
 
-The app is currently **unsigned** (personal build). On first launch macOS will
-say it's from an unidentified developer — open **System Settings → Privacy &
-Security** and click **Open Anyway**, or right-click the app → **Open**.
+### First launch — getting past Gatekeeper
+
+texnap is **not yet notarized by Apple** (that needs a paid Apple Developer
+account — it's on the roadmap). Because you downloaded it, macOS quarantines it,
+and on macOS 15 the old right-click → Open trick is gone. Do this once:
+
+1. Try to open texnap. macOS blocks it ("Apple could not verify…").
+2. Open **System Settings → Privacy & Security**, scroll down to the message
+   "texnap was blocked", and click **Open Anyway**, then confirm with Touch ID
+   / your password. texnap opens normally from then on.
+
+If instead it says texnap is **"damaged and can't be opened"** (a stricter
+quarantine some downloads get), clear the quarantine flag in Terminal, then open
+it the normal way:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/texnap.app
+```
+
+This is only because the app is unsigned — none of it phones home, and you bring
+your own API key (below). Prefer no warnings at all? Use the CLI, which builds
+from source (see [Command line](#command-line)).
 
 ## Setup
 
