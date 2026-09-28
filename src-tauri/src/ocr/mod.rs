@@ -74,6 +74,37 @@ pub(crate) fn parse_data_url(data_url: &str) -> Result<(String, String), OcrErro
     Ok((mime.to_string(), data.to_string()))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_a_data_url() {
+        let (mime, data) = parse_data_url("data:image/png;base64,AAAB").unwrap();
+        assert_eq!(mime, "image/png");
+        assert_eq!(data, "AAAB");
+    }
+
+    #[test]
+    fn rejects_non_data_urls() {
+        assert!(parse_data_url("not a data url").is_err());
+        assert!(parse_data_url("data:image/png,AAAB").is_err()); // missing ;base64
+    }
+
+    #[test]
+    fn retryable_covers_quota_overload_5xx_and_network() {
+        assert!(OcrError::Network("x".into()).is_retryable());
+        assert!(OcrError::Api { status: 429, message: String::new() }.is_retryable());
+        assert!(OcrError::Api { status: 529, message: String::new() }.is_retryable());
+        assert!(OcrError::Api { status: 503, message: String::new() }.is_retryable());
+        // Not retryable: bad key / bad request / client-side.
+        assert!(!OcrError::Api { status: 401, message: String::new() }.is_retryable());
+        assert!(!OcrError::Api { status: 400, message: String::new() }.is_retryable());
+        assert!(!OcrError::MissingApiKey.is_retryable());
+        assert!(!OcrError::MalformedImage("x".into()).is_retryable());
+    }
+}
+
 pub async fn transcribe_to_latex(
     provider: Provider,
     image_data_url: &str,

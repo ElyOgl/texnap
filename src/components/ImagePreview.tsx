@@ -30,6 +30,18 @@ type Verdict = {
   providerLabel: string;
 };
 
+// Turn the raw Rust error into something actionable.
+function friendlyError(raw: string): string {
+  if (raw.includes(" 429") || /quota|rate.?limit/i.test(raw))
+    return "Daily free quota reached. Add another provider's key in Settings (⌘,), or wait for it to reset.";
+  if (/^Network error/.test(raw) || /network/i.test(raw))
+    return "Network problem — check your connection and try again.";
+  if (/No API key/i.test(raw)) return "No API key configured — set one in Settings (⌘,).";
+  if (/401|403|invalid.*key|api.?key/i.test(raw))
+    return "The API key was rejected. Check it in Settings (⌘,).";
+  return raw;
+}
+
 export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChange, onClear }: Props) {
   const { image, latex, provider, seconds } = session;
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +175,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
 
         {!loading && error && (
           <div className="rounded-lg border border-red-900 bg-red-950/60 px-3 py-2 text-[12px] text-red-300">
-            {error}
+            {friendlyError(error)}
             <button
               onClick={() => void transcribe()}
               className="mt-2 block text-red-200 underline hover:text-red-100"

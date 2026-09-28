@@ -164,6 +164,36 @@ fn strip_prefix_note(line: &str) -> String {
         .unwrap_or_default()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{key_to_code, parse_shortcut};
+    use tauri_plugin_global_shortcut::{Code, Modifiers};
+
+    #[test]
+    fn key_to_code_handles_codes_and_bare_chars() {
+        assert_eq!(key_to_code("KeyM"), Some(Code::KeyM));
+        assert_eq!(key_to_code("M"), Some(Code::KeyM));
+        assert_eq!(key_to_code("Semicolon"), Some(Code::Semicolon)); // AZERTY "M" position
+        assert_eq!(key_to_code("2"), Some(Code::Digit2));
+        assert_eq!(key_to_code("Space"), Some(Code::Space));
+        assert_eq!(key_to_code("nonsense!!"), None);
+    }
+
+    #[test]
+    fn parse_shortcut_builds_the_expected_combo() {
+        let sc = parse_shortcut("Ctrl+Cmd+M").unwrap();
+        assert_eq!(sc.key, Code::KeyM);
+        assert!(sc.mods.contains(Modifiers::CONTROL));
+        assert!(sc.mods.contains(Modifiers::SUPER));
+        assert!(!sc.mods.contains(Modifiers::SHIFT));
+    }
+
+    #[test]
+    fn parse_shortcut_needs_a_key() {
+        assert!(parse_shortcut("Ctrl+Cmd").is_none());
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Dev convenience only: searches upward from CWD, so a repo-root .env is

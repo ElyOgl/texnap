@@ -10,9 +10,11 @@ type Props = {
 // the App level so it works in any view — this is just the drop-zone surface.
 export function CaptureZone({ isDragging, onPick, providerLabel }: Props) {
   return (
-    // Space is left above the drop zone on purpose — a small header will go
-    // there later.
     <div className="flex flex-col gap-3">
+      <div className="pt-1 text-center">
+        <div className="text-[15px] font-semibold text-ink">texnap</div>
+        <div className="mt-0.5 text-[11px] text-ink-3">screenshot → LaTeX</div>
+      </div>
       <button
         type="button"
         onClick={onPick}
