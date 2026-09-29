@@ -122,13 +122,18 @@ configured provider if one hits its quota.
 
 | Key | Action |
 | --- | --- |
-| ⌃⌘, | Capture a screen region (customizable in Settings) |
+| ⌃⌘M | Capture a screen region (customizable in Settings) |
 | ⌘V | Paste / new capture |
 | ⏎ | Transcribe |
 | ⌘C | Copy the LaTeX |
 | ⌘Z | Undo the last capture |
 | ⌘F | Search the library (in the library view) |
 | ⌘, | Settings |
+
+The capture shortcut is bound to a **physical key position**, not a letter, so
+it fires the same regardless of layout. The default is the key at the QWERTY
+**M** position — which on an **AZERTY** keyboard is the **,** key (so AZERTY
+users press ⌃⌘,). Re-record it for your own layout anytime in Settings.
 
 ## Development
 
