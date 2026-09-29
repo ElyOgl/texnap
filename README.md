@@ -31,8 +31,7 @@ universal build comes with the signed release.
 
 ### First launch — getting past Gatekeeper
 
-texnap is **not yet notarized by Apple** (that needs a paid Apple Developer
-account — it's on the roadmap). Because you downloaded it, macOS quarantines it,
+texnap is **not yet notarized by Apple** (We do not have that yet but it's underway !). Because you downloaded it, macOS quarantines it,
 and on macOS 15 the old right-click → Open trick is gone. Do this once:
 
 1. Try to open texnap. macOS blocks it ("Apple could not verify…").
@@ -88,7 +87,7 @@ configured provider if one hits its quota.
 
 | Key | Action |
 | --- | --- |
-| ⌃⌘M | Capture a screen region (customizable in Settings) |
+| ⌃⌘, | Capture a screen region (customizable in Settings) |
 | ⌘V | Paste / new capture |
 | ⏎ | Transcribe |
 | ⌘C | Copy the LaTeX |
