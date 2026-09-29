@@ -19,8 +19,10 @@ secrets are shipped in the app.
 - **Five OCR providers** — Google Gemini (free tier), SimpleTex, OpenRouter,
   OpenAI, Anthropic — with **automatic fallback** if one hits its quota.
 - **Live editing** with KaTeX preview, one-key copy, and undo (⌘Z).
-- **History** of past transcriptions, and an optional **accuracy check** that
-  asks the model whether the LaTeX matches the image.
+- **Formula library** — every transcription is saved automatically; tag it,
+  pin it, and search across your formulas (see [Library](#library) below).
+- **Accuracy check** (optional) — a second pass asks the model whether the
+  LaTeX faithfully matches the source image.
 
 ## Install
 
@@ -57,6 +59,39 @@ On first run, pick a provider and paste an API key (stored locally on your Mac,
 never in the repo). Gemini has a free tier and is a good default —
 [get a key](https://aistudio.google.com/apikey).
 
+## Library
+
+Every transcription is **saved automatically** — no "save" button. Open the
+library from the bookmark icon in the top bar to browse, re-open, or re-copy
+anything you've transcribed. Each entry keeps a thumbnail of the source, the
+LaTeX, which provider produced it, and when.
+
+- **Tags** — organize formulas by chapter or topic ("Séries entières",
+  "Réduction", …). Add tags right after transcribing (a *Tags* row appears under
+  the result) or on any entry in the library. Tags autocomplete from ones you've
+  already used, and clicking a tag filters the list to it.
+- **Pin** — pin the formulas you reach for often; they sort to the top in a
+  *Pinned* section.
+- **Search** — press ⌘F in the library to search across both the LaTeX and your
+  tags.
+
+### Keeping formulas vs. the rolling log
+
+The library doubles as a recent-history log *and* a curated collection, with one
+simple rule:
+
+- **Untagged, unpinned** entries are a rolling log — only the most recent 100 are
+  kept, older ones fall off.
+- **Tagged or pinned** entries are kept **indefinitely** — they never fall off.
+
+So to keep a formula around for good, just **tag or pin it**. The library's
+*Clear untagged* button purges only the rolling log; your tagged and pinned
+formulas are never touched.
+
+Everything lives in `history.json` under
+`~/Library/Application Support/fr.elyo.texnap/` (next to your API key) — local
+to your Mac, never uploaded, kept across restarts, and shared with the CLI.
+
 ## Command line
 
 texnap also ships as a terminal tool that reuses the exact same engine — handy
@@ -92,6 +127,7 @@ configured provider if one hits its quota.
 | ⏎ | Transcribe |
 | ⌘C | Copy the LaTeX |
 | ⌘Z | Undo the last capture |
+| ⌘F | Search the library (in the library view) |
 | ⌘, | Settings |
 
 ## Development
