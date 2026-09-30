@@ -1,13 +1,19 @@
 use super::{parse_data_url, OcrError};
 use serde::{Deserialize, Serialize};
 
-// gemini-2.5-flash returned 404 "no longer available to new users" as of
-// 2026-09-24 — Google is retiring old Flash generations fairly quickly.
-// generateContent itself is NOT deprecated (Google: "recommended path for
-// stable deployments"), only individual model IDs churn; if this 404s again,
-// check https://ai.google.dev/gemini-api/docs/models for the current Flash
-// model rather than assuming the endpoint shape changed.
-const MODEL: &str = "gemini-3.6-flash";
+// Flash-Lite, not full Flash: as of 2026-09 Google tightened the free-tier
+// daily quota on the newer full-Flash models hard (gemini-3.x-flash dropped to
+// ~20 requests/day free), while the Flash-Lite line keeps a much larger free
+// RPD (~500/day). Transcription here disables thinking anyway (thinkingBudget
+// 0), so Flash-Lite's smaller reasoning budget costs us nothing and the extra
+// daily headroom is exactly what a screenshot-many-times-a-day tool needs.
+// gemini-3.5-flash-lite is the current stable, multimodal Flash-Lite.
+//
+// Model IDs churn (gemini-2.5-flash was 404'd "no longer available to new
+// users" in 2026-09); generateContent itself is NOT deprecated. If this 404s,
+// check https://ai.google.dev/gemini-api/docs/models for the current model
+// rather than assuming the endpoint shape changed.
+const MODEL: &str = "gemini-3.5-flash-lite";
 
 fn api_url() -> String {
     format!("https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent")
@@ -34,22 +40,14 @@ struct Content {
     parts: Vec<Part>,
 }
 
-// gemini-2.5/3.x Flash think by default, and thinking tokens are billed
-// against maxOutputTokens — a low or unset limit means the model can burn
-// its whole budget "thinking" and get cut off before writing the actual
-// answer (confirmed against real output 2026-09-24: response stopped
-// mid-formula with no error). Transcription doesn't need reasoning, so
-// thinking is disabled outright rather than just raising the token cap.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ThinkingConfig {
-    thinking_budget: i32,
-}
-
+// Flash-Lite doesn't "think" by default (unlike full Flash, which can burn its
+// output budget thinking and get cut off mid-formula — the 2026-09-24 truncation
+// bug). So we send no thinkingConfig at all: it's unnecessary here, and
+// gemini-3.5-flash-lite actually rejects it (HTTP 400 "invalid argument").
+// maxOutputTokens stays generous so a long multi-line transcription isn't clipped.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct GenerationConfig {
-    thinking_config: ThinkingConfig,
     max_output_tokens: u32,
 }
 
@@ -114,7 +112,6 @@ pub async fn call(image_data_url: &str, prompt: &str, api_key: &str) -> Result<S
             ],
         }],
         generation_config: GenerationConfig {
-            thinking_config: ThinkingConfig { thinking_budget: 0 },
             max_output_tokens: 4096,
         },
     };
