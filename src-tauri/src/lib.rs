@@ -73,6 +73,35 @@ fn read_image_as_base64(path: String) -> Result<capture::CapturedImage, String> 
     capture::read_image_as_base64(path)
 }
 
+// Write a text file to a user-chosen path (F2: exporting a fiche as .tex). The
+// path comes from the native save dialog on the JS side.
+#[tauri::command]
+fn save_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| format!("Couldn't write {path}: {e}"))
+}
+
+// Write a fiche as a standalone HTML file and return its path (F2: exporting a
+// PDF). WKWebView's window.print() is a no-op in Tauri, so we open this page in
+// the user's real browser, where Cmd+P / "Save as PDF" works and the math stays
+// crisp vector text. Written into the app's cache dir so the opener scope
+// ($APPCACHE) resolves to the exact same path (no /var vs /private/var symlink
+// mismatch that bites $TEMP on macOS).
+#[tauri::command]
+fn write_temp_html(app: AppHandle, contents: String) -> Result<String, String> {
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Couldn't resolve the cache dir: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Couldn't create {}: {e}", dir.display()))?;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = dir.join(format!("texnap-fiche-{ts}.html"));
+    std::fs::write(&path, contents).map_err(|e| format!("Couldn't write the fiche: {e}"))?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 fn set_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
     let previous = config::current_shortcut(&app);
@@ -250,6 +279,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             read_image_as_base64,
+            save_text_file,
+            write_temp_html,
             config::get_config_status,
             config::list_providers,
             config::save_provider_key,

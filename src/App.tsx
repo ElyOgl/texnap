@@ -5,6 +5,7 @@ import { ApiKeySetup } from "./components/ApiKeySetup";
 import { CaptureZone } from "./components/CaptureZone";
 import { ImagePreview } from "./components/ImagePreview";
 import { LibraryPanel } from "./components/LibraryPanel";
+import { FichePanel } from "./components/FichePanel";
 import { HintBar } from "./components/ui";
 import { useImageCapture } from "./lib/useImageCapture";
 import { isEditableTarget } from "./lib/dom";
@@ -27,6 +28,8 @@ function App() {
   // from the result view (F1). Tied to the image it came from — cleared on a
   // new capture so tags never leak to the next formula.
   const [savedEntry, setSavedEntry] = useState<{ id: string; imageId: string; tags: string[] } | null>(null);
+  // F2: the selected library entries being turned into a fiche (PDF/.tex).
+  const [sheetEntries, setSheetEntries] = useState<HistoryEntry[] | null>(null);
 
   const refresh = useCallback(async () => {
     const [status, list] = await Promise.all([
@@ -79,6 +82,11 @@ function App() {
         setShowSettings(true);
         return;
       }
+      if (e.key === "Escape" && sheetEntries) {
+        e.preventDefault();
+        setSheetEntries(null); // fiche → back to the library
+        return;
+      }
       if (e.key === "Escape" && showHistory) {
         e.preventDefault();
         setShowHistory(false);
@@ -97,7 +105,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [configured, showSettings, showHistory]);
+  }, [configured, showSettings, showHistory, sheetEntries]);
 
   const openHistoryEntry = (entry: HistoryEntry) => {
     dispatch({
@@ -163,8 +171,14 @@ function App() {
             onDone={settingsDone}
             onCancel={configured ? () => setShowSettings(false) : undefined}
           />
+        ) : sheetEntries ? (
+          <FichePanel entries={sheetEntries} onClose={() => setSheetEntries(null)} />
         ) : showHistory ? (
-          <LibraryPanel onOpen={openHistoryEntry} onClose={() => setShowHistory(false)} />
+          <LibraryPanel
+            onOpen={openHistoryEntry}
+            onClose={() => setShowHistory(false)}
+            onCreateSheet={(entries) => setSheetEntries(entries)}
+          />
         ) : session ? (
           <ImagePreview
             session={session}

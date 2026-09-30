@@ -1,0 +1,69 @@
+import type { HistoryEntry } from "./history";
+
+export type Group = { tag: string; entries: HistoryEntry[] };
+
+const UNTAGGED = "Sans tag";
+
+/// Group entries for the sheet. When `grouped`, bucket by each entry's first
+/// tag (entries keep their order; untagged ones go last under "Sans tag"). When
+/// not grouped, one bucket with everything.
+export function groupForSheet(entries: HistoryEntry[], grouped: boolean): Group[] {
+  if (!grouped) return entries.length ? [{ tag: "", entries }] : [];
+  const order: string[] = [];
+  const buckets = new Map<string, HistoryEntry[]>();
+  for (const e of entries) {
+    const tag = e.tags?.[0] ?? UNTAGGED;
+    if (!buckets.has(tag)) {
+      buckets.set(tag, []);
+      order.push(tag);
+    }
+    buckets.get(tag)!.push(e);
+  }
+  // Untagged bucket sorts last.
+  order.sort((a, b) => (a === UNTAGGED ? 1 : 0) - (b === UNTAGGED ? 1 : 0));
+  return order.map((tag) => ({ tag, entries: buckets.get(tag)! }));
+}
+
+// Escape the handful of LaTeX specials that can appear in a user-typed title.
+function escapeTitle(s: string): string {
+  return s.replace(/([&%#_$])/g, "\\$1");
+}
+
+/// A bare formula needs display-math wrapping to compile; a snippet that already
+/// carries a math environment or text/markup goes in verbatim.
+export function wrapForTex(latex: string): string {
+  const s = latex.trim();
+  const hasMathEnv =
+    /\\begin\{(align|equation|gather|multline|cases|array|[pbvBV]?matrix|split)\*?\}/.test(s) ||
+    s.includes("\\[") ||
+    s.includes("$$") ||
+    /(^|[^\\])\$/.test(s);
+  const hasText = /\\(text|textbf|textit|section|subsection|item)\b|\\begin\{(itemize|enumerate)\}/.test(s);
+  return hasMathEnv || hasText ? s : `\\[\n${s}\n\\]`;
+}
+
+/// Build a compilable standalone .tex document from the selected entries.
+export function buildTex(title: string, groups: Group[]): string {
+  const head = [
+    "\\documentclass[a4paper,11pt]{article}",
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage[french]{babel}",
+    "\\usepackage{amsmath,amssymb}",
+    "\\usepackage[margin=2cm]{geometry}",
+    "",
+    "\\begin{document}",
+    "",
+    `\\begin{center}\\Large\\textbf{${escapeTitle(title)}}\\end{center}`,
+    "\\medskip",
+    "",
+  ];
+  const body: string[] = [];
+  for (const g of groups) {
+    if (g.tag) body.push(`\\section*{${escapeTitle(g.tag)}}`, "");
+    for (const e of g.entries) {
+      body.push(wrapForTex(e.latex), "\\bigskip", "");
+    }
+  }
+  return [...head, ...body, "\\end{document}", ""].join("\n");
+}
