@@ -11,6 +11,9 @@ pub enum Provider {
     OpenRouter,
     OpenAi,
     Anthropic,
+    /// F6: offline on-device model (no key, no network). Not in `ALL` until the
+    /// app wires model download + selection; reachable via `from_str("local")`.
+    Local,
 }
 
 impl Provider {
@@ -30,6 +33,7 @@ impl Provider {
             Provider::OpenRouter => "openrouter",
             Provider::OpenAi => "openai",
             Provider::Anthropic => "anthropic",
+            Provider::Local => "local",
         }
     }
 
@@ -40,8 +44,14 @@ impl Provider {
             "openrouter" => Some(Provider::OpenRouter),
             "openai" => Some(Provider::OpenAi),
             "anthropic" => Some(Provider::Anthropic),
+            "local" => Some(Provider::Local),
             _ => None,
         }
+    }
+
+    /// Whether this provider needs an API key (the local model doesn't).
+    pub fn needs_key(&self) -> bool {
+        !matches!(self, Provider::Local)
     }
 
     /// Dev-only convenience override, checked before the stored key.
@@ -52,6 +62,7 @@ impl Provider {
             Provider::OpenRouter => "OPENROUTER_API_KEY",
             Provider::OpenAi => "OPENAI_API_KEY",
             Provider::Anthropic => "ANTHROPIC_API_KEY",
+            Provider::Local => "TEXNAP_LOCAL",
         }
     }
 
@@ -96,6 +107,14 @@ impl Provider {
                 note: "No ongoing free tier, trial credits only.",
                 key_placeholder: "sk-ant-...",
                 get_key_url: "https://console.anthropic.com/settings/keys",
+            },
+            Provider::Local => ProviderInfo {
+                id: "local",
+                label: "Local (offline)",
+                free_tier: true,
+                note: "Runs on your Mac — no key, no quota, works offline. Downloads a ~600 MB model once.",
+                key_placeholder: "",
+                get_key_url: "",
             },
         }
     }

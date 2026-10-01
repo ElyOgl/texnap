@@ -13,3 +13,14 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
+
+# Offline local OCR (F6), behind the `local` feature so the CLI stays light and
+# only the desktop app pulls onnxruntime + the model runtime. Enable with
+# `texnap-core = { ..., features = ["local"] }`.
+ort = { version = "=2.0.0-rc.13", features = ["half"], optional = true }
+tokenizers = { version = "0.20", default-features = false, features = ["onig"], optional = true }
+image = { version = "0.25", optional = true }
+half = { version = "2", optional = true }
+
+[features]
+local = ["dep:ort", "dep:tokenizers", "dep:image", "dep:half"]

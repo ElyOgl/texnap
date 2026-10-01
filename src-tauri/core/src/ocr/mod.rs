@@ -5,6 +5,8 @@
 
 mod anthropic;
 mod gemini;
+#[cfg(feature = "local")]
+pub mod local;
 mod openai_compat;
 mod simpletex;
 
@@ -28,6 +30,10 @@ pub enum OcrError {
     Network(String),
     Api { status: u16, message: String },
     UnparseableResponse(String),
+    /// F6: the local model isn't downloaded yet (offline provider).
+    ModelNotDownloaded,
+    /// F6: local inference failed (model load / runtime error).
+    Local(String),
 }
 
 impl OcrError {
@@ -57,6 +63,10 @@ impl fmt::Display for OcrError {
             OcrError::UnparseableResponse(msg) => {
                 write!(f, "Couldn't parse the OCR provider's response: {msg}")
             }
+            OcrError::ModelNotDownloaded => {
+                write!(f, "The local model isn't downloaded yet.")
+            }
+            OcrError::Local(msg) => write!(f, "Local OCR failed: {msg}"),
         }
     }
 }
@@ -120,7 +130,27 @@ pub async fn transcribe_to_latex(
         Provider::OpenAi => {
             openai_compat::call(&openai_compat::OPENAI, image_data_url, PROMPT, api_key).await
         }
+        // The local model needs a model directory, not an API key — it's routed
+        // via `transcribe_local`, never through this key-based dispatch.
+        Provider::Local => Err(OcrError::Local(
+            "local provider must be called via transcribe_local".into(),
+        )),
     }
+}
+
+/// F6: transcribe with the on-device model in `model_dir` (no key, no network).
+#[cfg(feature = "local")]
+pub fn transcribe_local(
+    image_data_url: &str,
+    model_dir: &std::path::Path,
+) -> Result<String, OcrError> {
+    local::transcribe(image_data_url, model_dir)
+}
+
+/// F6: whether the local model files are present in `model_dir`.
+#[cfg(feature = "local")]
+pub fn local_model_downloaded(model_dir: &std::path::Path) -> bool {
+    local::is_downloaded(model_dir)
 }
 
 fn verify_prompt(latex: &str) -> String {
@@ -157,6 +187,10 @@ pub async fn verify(
         Provider::SimpleTex => Err(OcrError::Api {
             status: 0,
             message: "SimpleTex is OCR-only and can't verify.".into(),
+        }),
+        Provider::Local => Err(OcrError::Api {
+            status: 0,
+            message: "The local model can't verify.".into(),
         }),
     }
 }
