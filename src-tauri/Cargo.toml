@@ -1,6 +1,6 @@
 [package]
 name = "texnap"
-version = "0.4.2"
+version = "0.5.0"
 description = "A Tauri App"
 authors = ["Elyo"]
 edition = "2021"
@@ -46,11 +46,14 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 sha2 = { version = "0.10", optional = true }
 futures-util = { version = "0.3", optional = true }
 
-# The F6 `local` feature (offline on-device OCR) links onnxruntime and is OFF by
-# default so the shipped `.dmg` stays lean and launch-safe until the onnxruntime
-# dylib is verified to bundle. Dev/test with it via `tauri dev --features local`;
-# a release enables it only once bundling is confirmed.
+# The F6 `local` feature (offline on-device OCR) links onnxruntime. `ort`'s
+# `download-binaries` links it STATICALLY into the binary on macOS (verified:
+# `otool -L` shows no libonnxruntime.dylib, 30k+ onnxruntime symbols are baked
+# in), so there is nothing to bundle — the feature ships safely. It is ON by
+# default so `npm run tauri build` includes local OCR in the `.dmg`; build a lean
+# variant with `--no-default-features` if ever needed.
 [features]
+default = ["local"]
 local = ["texnap-core/local", "dep:reqwest", "dep:sha2", "dep:futures-util"]
 
 

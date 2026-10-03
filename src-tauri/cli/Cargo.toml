@@ -1,6 +1,6 @@
 [package]
 name = "texnap-cli"
-version = "0.4.2"
+version = "0.5.0"
 description = "texnap on the command line: an image of math in, LaTeX out."
 authors = ["Elyo"]
 edition = "2021"

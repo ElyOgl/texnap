@@ -5341,7 +5341,7 @@ dependencies = [
 
 [[package]]
 name = "texnap"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "base64 0.22.1",
  "dotenvy",
@@ -5363,7 +5363,7 @@ dependencies = [
 
 [[package]]
 name = "texnap-cli"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -5374,7 +5374,7 @@ dependencies = [
 
 [[package]]
 name = "texnap-core"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "base64 0.22.1",
  "half",
