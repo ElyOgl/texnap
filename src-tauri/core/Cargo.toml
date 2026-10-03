@@ -1,6 +1,6 @@
 [package]
 name = "texnap-core"
-version = "0.4.1"
+version = "0.4.2"
 description = "texnap's Tauri-free OCR engine: providers, transcription, verification, key resolution."
 authors = ["Elyo"]
 edition = "2021"
