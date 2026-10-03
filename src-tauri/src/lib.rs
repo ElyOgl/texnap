@@ -232,32 +232,42 @@ struct Transcription {
     fell_back_from: Option<&'static str>,
 }
 
+// F6: run the on-device model off the async runtime (inference is CPU-heavy).
+async fn transcribe_local_in_app(app: &AppHandle, image_data_url: &str) -> Result<String, String> {
+    let dir = local_model_dir(app)?;
+    if !ocr::local_model_downloaded(&dir) {
+        return Err("The offline model isn't downloaded yet — get it in Settings (⌘,).".into());
+    }
+    let url = image_data_url.to_string();
+    tauri::async_runtime::spawn_blocking(move || ocr::transcribe_local(&url, &dir))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transcription, String> {
-    // F6: the local model is keyless — route it on-device, off the key-based
-    // cloud chain. Runs on a blocking thread so inference doesn't stall the
-    // async runtime.
+    let local_label = provider::Provider::Local.info().label;
+    let local_ready = local_model_dir(&app)
+        .map(|d| ocr::local_model_downloaded(&d))
+        .unwrap_or(false);
+
+    // The user explicitly picked the local model → run on-device (keyless).
     if config::active_provider(&app) == provider::Provider::Local {
-        let dir = local_model_dir(&app)?;
-        if !ocr::local_model_downloaded(&dir) {
-            return Err("The offline model isn't downloaded yet — get it in Settings (⌘,).".into());
-        }
-        let url = image_data_url.clone();
-        let latex = tauri::async_runtime::spawn_blocking(move || ocr::transcribe_local(&url, &dir))
-            .await
-            .map_err(|e| e.to_string())?
-            .map_err(|e| e.to_string())?;
-        return Ok(Transcription {
-            latex,
-            provider_label: provider::Provider::Local.info().label,
-            fell_back_from: None,
-        });
+        let latex = transcribe_local_in_app(&app, &image_data_url).await?;
+        return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None });
     }
 
     let chain = config::fallback_chain(&app);
     if chain.is_empty() {
+        // No cloud key configured — use the local model if it's downloaded.
+        if local_ready {
+            let latex = transcribe_local_in_app(&app, &image_data_url).await?;
+            return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None });
+        }
         return Err(ocr::OcrError::MissingApiKey.to_string());
     }
+
     let last = chain.len() - 1;
     for (idx, (provider, api_key)) in chain.iter().enumerate() {
         match ocr::transcribe_to_latex(*provider, &image_data_url, api_key).await {
@@ -272,7 +282,20 @@ async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transc
             }
             // Only fall through on a retryable failure with a provider left to try.
             Err(e) if idx < last && e.is_retryable() => continue,
-            Err(e) => return Err(e.to_string()),
+            Err(e) => {
+                // Auto-activation: a network/quota failure (i.e. likely offline)
+                // with the local model available → transcribe on-device instead.
+                if e.is_retryable() && local_ready {
+                    if let Ok(latex) = transcribe_local_in_app(&app, &image_data_url).await {
+                        return Ok(Transcription {
+                            latex,
+                            provider_label: local_label,
+                            fell_back_from: Some(chain[0].0.info().label),
+                        });
+                    }
+                }
+                return Err(e.to_string());
+            }
         }
     }
     unreachable!("loop returns on the last provider")

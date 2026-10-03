@@ -136,7 +136,7 @@ function App() {
           <>
             <button
               onClick={() => setShowHistory(true)}
-              title="Library"
+              title="Bibliothèque"
               className="text-ink-3 hover:text-ink-2"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -145,7 +145,7 @@ function App() {
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              title="OCR provider settings (⌘,)"
+              title="Réglages OCR (⌘,)"
               className="text-ink-3 hover:text-ink-2"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -165,7 +165,7 @@ function App() {
 
       <div className="flex min-h-0 flex-1 flex-col">
         {configured === null ? (
-          <p className="p-3.5 text-[12px] text-ink-3">Checking configuration…</p>
+          <p className="p-3.5 text-[12px] text-ink-3">Vérification de la configuration…</p>
         ) : configured === false || showSettings ? (
           <ApiKeySetup
             onDone={settingsDone}
@@ -217,13 +217,14 @@ function App() {
                 isDragging={isDragging}
                 onPick={() => void pickFile()}
                 providerLabel={activeProviderLabel}
+                onOpenSettings={() => setShowSettings(true)}
               />
             </div>
             <HintBar
               hints={[
-                { keys: ["⌘", "V"], label: "Paste" },
-                ...(history.past.length > 0 ? [{ keys: ["⌘", "Z"], label: "Undo" }] : []),
-                { keys: ["⌘", ","], label: "Settings", right: true },
+                { keys: ["⌘", "V"], label: "Coller" },
+                ...(history.past.length > 0 ? [{ keys: ["⌘", "Z"], label: "Annuler" }] : []),
+                { keys: ["⌘", ","], label: "Réglages", right: true },
               ]}
             />
           </div>

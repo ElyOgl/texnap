@@ -83,7 +83,9 @@ pub fn get_config_status(app: AppHandle) -> ConfigStatus {
     let stored = read_stored(&app);
     let provider = core_config::active_provider(&stored);
     ConfigStatus {
-        configured: core_config::key_for(&stored, provider).is_some(),
+        // A keyless provider (the local model) counts as configured — otherwise
+        // selecting it would bounce the user back into setup forever.
+        configured: !provider.needs_key() || core_config::key_for(&stored, provider).is_some(),
         active_provider: provider.as_str(),
         saved_providers: Provider::ALL
             .iter()

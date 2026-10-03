@@ -51,7 +51,7 @@ export function TagEditor({ tags, suggestions = [], onChange, compact }: Props) 
             type="button"
             onClick={() => remove(tag)}
             className="text-ink-3 hover:text-ink"
-            aria-label={`Remove tag ${tag}`}
+            aria-label={`Retirer le tag ${tag}`}
           >
             ×
           </button>

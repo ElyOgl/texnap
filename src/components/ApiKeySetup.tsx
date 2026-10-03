@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { ConfigStatus, ProviderInfo } from "../lib/providers";
 import { HintBar } from "./ui";
 
@@ -62,6 +63,12 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   const [shortcutLabel, setShortcutLabel] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
+  // F6 local model (offline provider).
+  const [localStatus, setLocalStatus] = useState<"unknown" | "not-downloaded" | "downloading" | "ready">("unknown");
+  const [dlFiles, setDlFiles] = useState<{ name: string; received: number; total: number }[]>([]);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const isLocal = selected === "local";
 
   useEffect(() => {
     void (async () => {
@@ -104,6 +111,57 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [recording]);
 
+  // Check whether the local model is already downloaded when Local is selected.
+  useEffect(() => {
+    if (!isLocal) return;
+    void invoke<string>("local_model_status")
+      .then((s) => setLocalStatus(s === "ready" ? "ready" : "not-downloaded"))
+      .catch(() => setLocalStatus("not-downloaded"));
+  }, [isLocal]);
+
+  // Follow per-file download progress while downloading.
+  useEffect(() => {
+    if (localStatus !== "downloading") return;
+    const un = listen<{ received: number; total: number; index: number; count: number }>(
+      "local-model-progress",
+      (e) =>
+        setDlFiles((prev) =>
+          prev.map((f, i) =>
+            i === e.payload.index ? { ...f, received: e.payload.received, total: e.payload.total } : f,
+          ),
+        ),
+    );
+    return () => {
+      void un.then((f) => f());
+    };
+  }, [localStatus]);
+
+  const DL_LABELS = ["Encodeur", "Décodeur", "Vocabulaire"];
+  const downloadModel = async () => {
+    setLocalError(null);
+    setDlFiles(DL_LABELS.map((name) => ({ name, received: 0, total: 0 })));
+    setLocalStatus("downloading");
+    try {
+      await invoke("download_local_model");
+      setLocalStatus("ready");
+    } catch (err) {
+      setLocalError(String(err));
+      setLocalStatus("not-downloaded");
+    }
+  };
+
+  const useLocal = async () => {
+    setLocalError(null);
+    try {
+      await invoke("set_active_provider", { provider: "local" });
+      onDone();
+    } catch (err) {
+      setLocalError(String(err));
+    }
+  };
+
+  const mb = (n: number) => Math.round(n / 1048576);
+
   const info = providers?.find((p) => p.id === selected) ?? null;
   const alreadySaved = selected !== null && savedProviders.includes(selected);
 
@@ -143,14 +201,19 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   });
 
   if (!providers || !selected) {
-    return <p className="p-3.5 text-[12px] text-ink-3">Loading providers…</p>;
+    return <p className="p-3.5 text-[12px] text-ink-3">Chargement des fournisseurs…</p>;
   }
 
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-3.5">
+        {onCancel && (
+          <button onClick={onCancel} className="-mb-1 self-start text-[11px] text-ink-3 hover:text-ink-2">
+            ‹ Retour
+          </button>
+        )}
         <div>
-          <label className="mb-1.5 block text-[11px] text-ink-3">OCR provider</label>
+          <label className="mb-1.5 block text-[11px] text-ink-3">Fournisseur OCR</label>
           <div className="relative">
             <select
               value={selected}
@@ -164,8 +227,8 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               {providers.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
-                  {p.freeTier ? " — free tier" : ""}
-                  {savedProviders.includes(p.id) ? " (key saved)" : ""}
+                  {p.freeTier ? " — offre gratuite" : ""}
+                  {savedProviders.includes(p.id) ? " (clé enregistrée)" : ""}
                 </option>
               ))}
             </select>
@@ -184,17 +247,72 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
           {info && <p className="mt-1.5 text-[11px] text-ink-3">{info.note}</p>}
         </div>
 
+        {isLocal ? (
+          <div>
+            {localStatus === "ready" ? (
+              <div className="flex items-center gap-2.5 rounded-lg border border-ok/40 bg-surface-2 p-3">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ok">
+                  <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" />
+                </svg>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[12.5px] text-ink">Étape 3 — Modèle prêt, transcription hors-ligne</span>
+                  <span className="text-[10.5px] text-ink-3">Aucune clé requise · tourne sur ton Mac</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void useLocal()}
+                  className="ml-auto shrink-0 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
+                >
+                  Utiliser ce modèle
+                </button>
+              </div>
+            ) : localStatus === "downloading" ? (
+              <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 p-3">
+                <span className="text-[12px] text-ink-2">Étape 2 — Téléchargement du modèle…</span>
+                {dlFiles.map((f) => (
+                  <div key={f.name} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-[10.5px] text-ink-3">
+                      <span>{f.name}</span>
+                      <span className="font-mono">{f.total ? `${mb(f.received)} / ${mb(f.total)} Mo` : "…"}</span>
+                    </div>
+                    <div className="h-1 overflow-hidden rounded bg-surface-3">
+                      <div
+                        className="h-full bg-accent transition-[width] duration-150"
+                        style={{ width: f.total ? `${Math.round((f.received / f.total) * 100)}%` : "0%" }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface-2 p-3">
+                <span className="text-[12px] leading-relaxed text-ink-2">
+                  Étape 1 — Tourne sur ton Mac, <span className="text-ink">pas de clé, pas de quota, hors-ligne</span>. Télécharge un modèle (~600 Mo) une seule fois.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void downloadModel()}
+                  className="self-start rounded-md bg-accent px-3.5 py-2 text-[12px] font-medium text-accent-ink hover:brightness-110"
+                >
+                  Télécharger le modèle (~600 Mo)
+                </button>
+              </div>
+            )}
+            {localError && <p className="mt-1.5 text-[11px] text-red-400">{localError}</p>}
+            <p className="mt-1.5 text-[11px] text-ink-3">Hors connexion, texnap bascule automatiquement sur ce modèle.</p>
+          </div>
+        ) : (
         <div>
           <label className="mb-1.5 block text-[11px] text-ink-3">
-            API key
-            {alreadySaved && <span className="text-ink-2"> — a key is already saved</span>}
+            Clé API
+            {alreadySaved && <span className="text-ink-2"> — une clé est déjà enregistrée</span>}
           </label>
           <div className="relative">
             <input
               type={show ? "text" : "password"}
               value={key}
               onChange={(e) => setKey(e.currentTarget.value)}
-              placeholder={alreadySaved ? "Leave blank to keep the saved key" : info?.keyPlaceholder}
+              placeholder={alreadySaved ? "Laisser vide pour garder la clé enregistrée" : info?.keyPlaceholder}
               spellCheck={false}
               className="w-full rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5 pr-16 font-mono text-[12px] text-ink outline-none focus:border-accent/50"
             />
@@ -203,24 +321,25 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               onClick={() => setShow((s) => !s)}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-ink-3 hover:text-ink-2"
             >
-              {show ? "Hide" : "Show"}
+              {show ? "Masquer" : "Afficher"}
             </button>
           </div>
           <p className="mt-1.5 text-[11px] text-ink-3">
             {info && (
               <a href={info.getKeyUrl} target="_blank" rel="noreferrer" className="underline hover:text-ink-2">
-                Get a {info.label} key
+                Obtenir une clé {info.label}
               </a>
             )}
-            {" · stored locally on this Mac, never in the repo."}
+            {" · stockée localement sur ce Mac, jamais dans le dépôt."}
           </p>
         </div>
+        )}
 
         <div className="border-t border-line pt-3">
-          <label className="mb-1.5 block text-[11px] text-ink-3">Global capture shortcut</label>
+          <label className="mb-1.5 block text-[11px] text-ink-3">Raccourci de capture global</label>
           <div className="flex items-center gap-2">
             <span className="rounded-md border border-line-2 bg-surface-2 px-2.5 py-1.5 font-mono text-[12px] text-ink">
-              {recording ? "Press keys…" : shortcutLabel ?? "—"}
+              {recording ? "Appuie sur les touches…" : shortcutLabel ?? "—"}
             </span>
             <button
               type="button"
@@ -230,15 +349,29 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               }}
               className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink"
             >
-              {recording ? "Cancel" : "Change"}
+              {recording ? "Annuler" : "Modifier"}
             </button>
           </div>
           <p className="mt-1.5 text-[11px] text-ink-3">
             {recording
-              ? "Press a combo with a modifier (⌘/⌃/⌥/⇧), or Esc to cancel."
-              : "Snips a screen region from anywhere, then transcribes it. Needs macOS Screen Recording permission."}
+              ? "Appuie sur une combinaison avec un modificateur (⌘/⌃/⌥/⇧), ou Échap pour annuler."
+              : "Capture une région de l'écran depuis n'importe où, puis la transcrit. Nécessite l'autorisation « Enregistrement de l'écran » de macOS."}
           </p>
           {shortcutError && <p className="mt-1 text-[11px] text-red-400">{shortcutError}</p>}
+        </div>
+
+        <div className="border-t border-line pt-3">
+          <label className="mb-1.5 block text-[11px] text-ink-3">Langue</label>
+          <div className="relative">
+            <select
+              value="fr"
+              disabled
+              className="w-full appearance-none rounded-lg border border-line-2 bg-surface-2 px-3 py-2 text-[13px] text-ink opacity-80 outline-none"
+            >
+              <option value="fr">Français</option>
+            </select>
+          </div>
+          <p className="mt-1.5 text-[11px] text-ink-3">D'autres langues arriveront dans une mise à jour dédiée.</p>
         </div>
 
         {error && <p className="text-[12px] text-red-400">{error}</p>}
@@ -247,28 +380,42 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
           {onCancel && (
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => {
+                // Confirm = apply the current choice and close. For a saved
+                // provider or the ready local model this activates it; otherwise
+                // it just closes (the primary button handles saving a new key).
+                if (isLocal) {
+                  if (localStatus === "ready") void useLocal();
+                  else onCancel();
+                } else if (canSubmit) {
+                  void submit();
+                } else {
+                  onCancel();
+                }
+              }}
               className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink"
             >
-              Cancel
+              Confirmer
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => void submit()}
-            disabled={busy || !canSubmit}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-50"
-          >
-            {busy ? "Saving…" : alreadySaved && key.trim().length === 0 ? "Use provider" : "Save key"}
-            <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘⏎</span>
-          </button>
+          {!isLocal && (
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={busy || !canSubmit}
+              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-50"
+            >
+              {busy ? "Enregistrement…" : alreadySaved && key.trim().length === 0 ? "Utiliser ce fournisseur" : "Enregistrer la clé"}
+              <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘⏎</span>
+            </button>
+          )}
         </div>
       </div>
 
       <HintBar
         hints={[
-          { keys: ["⌘", "⏎"], label: "Save" },
-          ...(onCancel ? [{ keys: ["esc"], label: "Close", right: true }] : []),
+          { keys: ["⌘", "⏎"], label: "Enregistrer" },
+          ...(onCancel ? [{ keys: ["esc"], label: "Fermer", right: true }] : []),
         ]}
       />
     </div>

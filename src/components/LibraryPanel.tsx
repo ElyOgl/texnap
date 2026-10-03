@@ -140,7 +140,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
       key={entry.id}
       className="group flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-2 hover:border-line-2"
     >
-      <button onClick={() => onOpen(entry)} className="shrink-0" title="Open">
+      <button onClick={() => onOpen(entry)} className="shrink-0" title="Ouvrir">
         <img
           src={entry.thumbnail}
           alt=""
@@ -164,7 +164,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
       <div className="flex shrink-0 flex-col items-center gap-1.5">
         <button
           onClick={() => void togglePin(entry)}
-          title={entry.pinned ? "Unpin" : "Pin"}
+          title={entry.pinned ? "Désépingler" : "Épingler"}
           className={entry.pinned ? "text-accent" : "text-ink-3 opacity-0 hover:text-ink-2 group-hover:opacity-100"}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill={entry.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -176,7 +176,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
         <button
           onClick={() => void remove(entry.id)}
           className="text-ink-3 opacity-0 hover:text-ink-2 group-hover:opacity-100"
-          title="Remove"
+          title="Retirer"
         >
           ✕
         </button>
@@ -192,18 +192,18 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
             onClick={selecting ? cancelSelect : onClose}
             className="text-[11px] text-ink-3 hover:text-ink-2"
           >
-            {selecting ? "Cancel" : "‹ Back"}
+            {selecting ? "Annuler" : "‹ Retour"}
           </button>
           <span className="text-[13px] font-medium text-ink">
-            {selecting ? "Select formulas" : "Library"}
+            {selecting ? "Sélection de formules" : "Bibliothèque"}
           </span>
           {selecting ? (
             <button onClick={selectAllShown} className="text-[11px] text-ink-3 hover:text-ink-2">
-              Select all
+              Tout sélectionner
             </button>
           ) : (entries?.length ?? 0) > 0 ? (
             <button onClick={() => setSelecting(true)} className="text-[11px] text-accent hover:brightness-110">
-              Make sheet
+              Créer une fiche
             </button>
           ) : (
             <span className="w-8" />
@@ -212,14 +212,14 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
 
         {!selecting && (entries?.length ?? 0) > 0 && (
           <div className="flex items-center justify-between text-[11px] text-ink-3">
-            <span>{filtered.length} saved</span>
+            <span>{filtered.length} enregistrée{filtered.length > 1 ? "s" : ""}</span>
             {hasUncurated && (
               <button
                 onClick={() => void clearUncurated()}
                 className="hover:text-ink-2"
-                title="Remove untagged, unpinned entries (keeps your tagged/pinned formulas)"
+                title="Supprime les entrées ni taguées ni épinglées (garde tes formules taguées ou épinglées)"
               >
-                Clear untagged
+                Effacer les non-tagués
               </button>
             )}
           </div>
@@ -229,7 +229,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
           ref={searchRef}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
-          placeholder="Search formulas and tags…"
+          placeholder="Rechercher une formule ou un tag…"
           spellCheck={false}
           className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent/50"
         />
@@ -242,7 +242,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
                 activeTag === null ? "bg-accent text-accent-ink" : "bg-surface-3 text-ink-2 hover:text-ink"
               }`}
             >
-              All
+              Toutes
             </button>
             {allTags.map((tag) => (
               <button
@@ -259,12 +259,12 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
         )}
 
         {entries === null ? (
-          <p className="text-[12px] text-ink-3">Loading…</p>
+          <p className="text-[12px] text-ink-3">Chargement…</p>
         ) : filtered.length === 0 ? (
           <p className="py-8 text-center text-[12px] text-ink-3">
             {entries.length === 0
-              ? "No transcriptions yet. They’ll show up here."
-              : "Nothing matches. Try another search or tag."}
+              ? "Aucune transcription pour l’instant. Elles apparaîtront ici."
+              : "Aucun résultat. Essaie une autre recherche ou un autre tag."}
           </p>
         ) : (
           <>
@@ -274,7 +274,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="text-accent">
                     <path d="M9 4v6l-2 4h10l-2 -4v-6z" />
                   </svg>
-                  Pinned
+                  Épinglées
                 </div>
                 {pinned.map(row)}
                 {rest.length > 0 && <div className="h-px bg-line" />}
@@ -287,20 +287,20 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
 
       {selecting ? (
         <div className="flex items-center justify-between border-t border-line bg-titlebar px-3.5 py-2.5">
-          <span className="text-[11px] text-ink-2">{selected.size} selected</span>
+          <span className="text-[11px] text-ink-2">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
           <button
             onClick={createSheet}
             disabled={selected.size === 0}
             className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-40"
           >
-            Create sheet →
+            Créer la fiche →
           </button>
         </div>
       ) : (
         <HintBar
           hints={[
-            { keys: ["⌘", "F"], label: "Search" },
-            { keys: ["esc"], label: "Close", right: true },
+            { keys: ["⌘", "F"], label: "Rechercher" },
+            { keys: ["esc"], label: "Fermer", right: true },
           ]}
         />
       )}

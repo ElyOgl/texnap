@@ -104,24 +104,24 @@ export function FichePanel({ entries, onClose }: Props) {
       <div className="no-print flex flex-col gap-2.5 border-b border-line p-3.5">
         <div className="flex items-center justify-between">
           <button onClick={onClose} className="text-[11px] text-ink-3 hover:text-ink-2">
-            ‹ Back
+            ‹ Retour
           </button>
-          <span className="text-[13px] font-medium text-ink">Fiche · {entries.length} formulas</span>
+          <span className="text-[13px] font-medium text-ink">Fiche · {entries.length} formules</span>
           <span className="w-8" />
         </div>
         <input
           value={title}
           onChange={(e) => setTitle(e.currentTarget.value)}
-          placeholder="Sheet title"
+          placeholder="Titre de la fiche"
           className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink outline-none focus:border-accent/50"
         />
         <div className="flex items-center gap-4 text-[11px] text-ink-2">
           <label className="flex items-center gap-1.5">
             <input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.currentTarget.checked)} />
-            Group by tag
+            Grouper par tag
           </label>
           <label className="flex items-center gap-1.5">
-            Columns
+            Colonnes
             <select
               value={cols}
               onChange={(e) => setCols(Number(e.currentTarget.value))}
@@ -137,17 +137,17 @@ export function FichePanel({ entries, onClose }: Props) {
               onClick={() => void exportTex()}
               className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink"
             >
-              {savedTex ? "Saved .tex ✓" : "Export .tex"}
+              {savedTex ? ".tex enregistré ✓" : "Exporter .tex"}
             </button>
             <button
               onClick={() => void exportPdf()}
-              title="Opens a printable page in your browser — then Cmd+P → Save as PDF"
+              title="Ouvre une page imprimable dans ton navigateur — puis Cmd+P → Enregistrer en PDF"
               className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
             >
-              Export PDF
+              Exporter PDF
             </button>
           </div>
-          {pdfError && <p className="text-[11px] text-red-400">Couldn&rsquo;t open the print page: {pdfError}</p>}
+          {pdfError && <p className="text-[11px] text-red-400">Impossible d&rsquo;ouvrir la page d&rsquo;impression : {pdfError}</p>}
         </div>
       </div>
 
@@ -186,7 +186,7 @@ export function FichePanel({ entries, onClose }: Props) {
         </div>
       </div>
 
-      <HintBar hints={[{ keys: ["esc"], label: "Close", right: true }]} />
+      <HintBar hints={[{ keys: ["esc"], label: "Fermer", right: true }]} />
     </div>
   );
 }

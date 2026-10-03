@@ -35,15 +35,15 @@ type Verdict = {
   providerLabel: string;
 };
 
-// Turn the raw Rust error into something actionable.
+// Turn the raw Rust error into something actionable (in French).
 function friendlyError(raw: string): string {
   if (raw.includes(" 429") || /quota|rate.?limit/i.test(raw))
-    return "Daily free quota reached. Add another provider's key in Settings (⌘,), or wait for it to reset.";
+    return "Quota gratuit quotidien atteint. Ajoute la clé d'un autre fournisseur dans les Réglages (⌘,), ou attends la réinitialisation.";
   if (/^Network error/.test(raw) || /network/i.test(raw))
-    return "Network problem — check your connection and try again.";
-  if (/No API key/i.test(raw)) return "No API key configured — set one in Settings (⌘,).";
+    return "Problème réseau — vérifie ta connexion et réessaie.";
+  if (/No API key/i.test(raw)) return "Aucune clé API configurée — ajoute-en une dans les Réglages (⌘,).";
   if (/401|403|invalid.*key|api.?key/i.test(raw))
-    return "The API key was rejected. Check it in Settings (⌘,).";
+    return "La clé API a été rejetée. Vérifie-la dans les Réglages (⌘,).";
   return raw;
 }
 
@@ -149,7 +149,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
           <div className="mb-1.5 flex items-center justify-between text-[11px] text-ink-3">
             <span>Source</span>
             <button onClick={onClear} className="hover:text-ink-2">
-              Clear
+              Effacer
             </button>
           </div>
           <div className="overflow-hidden rounded-lg border border-line bg-surface-2">
@@ -163,7 +163,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
 
         {loading && (
           <div className="flex justify-center py-6">
-            <WanderingEyes label="Transcribing…" />
+            <WanderingEyes label="Transcription…" />
           </div>
         )}
 
@@ -173,7 +173,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
             onClick={() => void transcribe()}
             className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-ink hover:brightness-110"
           >
-            Transcribe to LaTeX
+            Transcrire en LaTeX
             <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10.5px]">⏎</span>
           </button>
         )}
@@ -185,7 +185,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
               onClick={() => void transcribe()}
               className="mt-2 block text-red-200 underline hover:text-red-100"
             >
-              Try again
+              Réessayer
             </button>
           </div>
         )}
@@ -194,8 +194,8 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
           <>
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-ink-3">
-                <span>Rendered</span>
-                {rendered && !rendered.hadError && <span className="text-ok">✓ renders</span>}
+                <span>Rendu</span>
+                {rendered && !rendered.hadError && <span className="text-ok">✓ rendu</span>}
               </div>
               <div
                 className="tex-render overflow-x-auto rounded-lg bg-paper px-4 py-3 text-paper-ink"
@@ -204,8 +204,8 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
               />
               {rendered?.hadError && (
                 <p className="mt-1.5 text-[11px] text-amber-400/90">
-                  Preview incomplete — the LaTeX may still be correct (KaTeX can&rsquo;t
-                  render part of it).
+                  Aperçu incomplet — le LaTeX peut tout de même être correct (KaTeX n&rsquo;en
+                  rend pas une partie).
                 </p>
               )}
             </div>
@@ -224,10 +224,10 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-ink-3">
                 {copied ? (
-                  <span className="text-ok">Copied to clipboard</span>
+                  <span className="text-ok">Copié dans le presse-papier</span>
                 ) : fellBackFrom ? (
                   <span className="text-amber-400/90">
-                    {fellBackFrom} unavailable — answered by {provider}
+                    {fellBackFrom} indisponible — répondu par {provider}
                     {seconds !== null && ` · ${seconds.toFixed(1)}s`}
                   </span>
                 ) : (
@@ -242,7 +242,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 onClick={() => void copy()}
                 className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
               >
-                Copy LaTeX
+                Copier le LaTeX
                 <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘C</span>
               </button>
             </div>
@@ -263,7 +263,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 disabled={verifying}
                 className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
               >
-                {verifying ? "Checking…" : "Check accuracy"}
+                {verifying ? "Vérification…" : "Vérifier la fidélité"}
               </button>
               {verdict && (
                 <span
@@ -276,9 +276,9 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                   }`}
                 >
                   {verdict.level === "match"
-                    ? "✓ looks faithful"
+                    ? "✓ semble fidèle"
                     : verdict.level === "minor"
-                      ? `~ check: ${verdict.note}`
+                      ? `~ à vérifier : ${verdict.note}`
                       : verdict.level === "mismatch"
                         ? `✗ ${verdict.note}`
                         : verdict.note}
@@ -293,13 +293,13 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
         hints={[
           ...(latex
             ? [
-                { keys: ["⌘", "C"], label: "Copy" },
-                { keys: ["⏎"], label: "Re-run" },
+                { keys: ["⌘", "C"], label: "Copier" },
+                { keys: ["⏎"], label: "Relancer" },
               ]
-            : [{ keys: ["⏎"], label: "Transcribe" }]),
-          { keys: ["⌘", "V"], label: "New" },
-          ...(canUndo ? [{ keys: ["⌘", "Z"], label: "Undo" }] : []),
-          { keys: ["⌘", ","], label: "Settings", right: true },
+            : [{ keys: ["⏎"], label: "Transcrire" }]),
+          { keys: ["⌘", "V"], label: "Nouveau" },
+          ...(canUndo ? [{ keys: ["⌘", "Z"], label: "Annuler" }] : []),
+          { keys: ["⌘", ","], label: "Réglages", right: true },
         ]}
       />
     </div>
