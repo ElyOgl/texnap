@@ -1,6 +1,6 @@
 [package]
 name = "texnap"
-version = "0.4.0"
+version = "0.4.1"
 description = "A Tauri App"
 authors = ["Elyo"]
 edition = "2021"
@@ -34,9 +34,11 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-global-shortcut = "2"
 # The OCR engine (providers, transcription, key-resolution rules) lives here,
-# shared with the CLI. The app enables `local` (offline on-device OCR, F6) which
-# pulls onnxruntime; the CLI depends on core without it, staying light.
-texnap-core = { path = "core", features = ["local"] }
+# shared with the CLI. NOTE: the F6 `local` feature (offline on-device OCR, pulls
+# onnxruntime) is intentionally OFF until the F6 integration is finished and the
+# onnxruntime dylib is verified to bundle into the .dmg — shipping it half-wired
+# would risk an app that won't launch. Re-enable with features = ["local"] then.
+texnap-core = { path = "core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
