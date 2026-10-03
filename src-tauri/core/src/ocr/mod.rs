@@ -19,6 +19,8 @@ Rules:
 - Output ONLY the LaTeX source, nothing else — no explanation, no markdown code fences, no \"Here is the LaTeX\" preamble.
 - Reproduce the formula(s) exactly as shown: same order, same grouping, same notation. Do not simplify, solve, or correct anything, even if it looks like a mistake in the source.
 - Use standard amsmath/amssymb environments and commands (\\frac, \\sqrt, \\sum, \\int, \\begin{cases}, \\begin{pmatrix}/\\begin{bmatrix}, \\begin{align*} for multi-line aligned equations, etc). Prefer semantic environments over ad-hoc spacing hacks.
+- PORTABILITY (important): the output must compile with ONLY \\usepackage{amsmath,amssymb} loaded. Use only commands from those two packages. In particular: use \\mathcal for script/calligraphic letters, never \\mathscr (needs the mathrsfs package); never use \\color or try to reproduce text colours; do not use commands from other packages (mathrsfs, xcolor, cancel, etc).
+- Do NOT reproduce equation numbers, and NEVER use \\tag — an equation number is not mathematical content, and \\tag is invalid outside an amsmath numbered environment (it errors inside $...$, $$...$$ and \\[...\\]). For a displayed equation use \\[ ... \\] (or \\begin{align*} / \\begin{gather*} for several lines). Never use $$ ... $$.
 - Escape LaTeX special characters (%, &, _, #, {, }) correctly when they appear as literal text rather than LaTeX syntax.
 - If there are multiple separate formulas in the image, separate them with a blank line, each as its own standalone snippet — unless the source clearly groups them (e.g. a system of equations), in which case use the appropriate environment.
 - If something is illegible or ambiguous, transcribe your best reading. Do not insert placeholder text or ask for clarification.";
