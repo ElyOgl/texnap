@@ -11,19 +11,20 @@ pub enum Provider {
     OpenRouter,
     OpenAi,
     Anthropic,
-    /// F6: offline on-device model (no key, no network). Not in `ALL` until the
-    /// app wires model download + selection; reachable via `from_str("local")`.
+    /// F6: offline on-device model (no key, no network). Functional only in
+    /// app builds with the `local` feature (which link onnxruntime).
     Local,
 }
 
 impl Provider {
-    // Order matters: this is the dropdown order, free tiers first.
-    pub const ALL: [Provider; 5] = [
+    // Order matters: this is the dropdown order, free tiers first; Local last.
+    pub const ALL: [Provider; 6] = [
         Provider::Gemini,
         Provider::SimpleTex,
         Provider::OpenRouter,
         Provider::OpenAi,
         Provider::Anthropic,
+        Provider::Local,
     ];
 
     pub fn as_str(&self) -> &'static str {

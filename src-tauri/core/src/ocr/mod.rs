@@ -155,6 +155,16 @@ pub fn local_model_downloaded(model_dir: &std::path::Path) -> bool {
     local::is_downloaded(model_dir)
 }
 
+/// Stubs for builds without the `local` feature, so callers compile either way.
+#[cfg(not(feature = "local"))]
+pub fn transcribe_local(_: &str, _: &std::path::Path) -> Result<String, OcrError> {
+    Err(OcrError::Local("local OCR isn't included in this build".into()))
+}
+#[cfg(not(feature = "local"))]
+pub fn local_model_downloaded(_: &std::path::Path) -> bool {
+    false
+}
+
 fn verify_prompt(latex: &str) -> String {
     format!(
         "You are checking a LaTeX transcription against the source image. Candidate LaTeX:\n\n{latex}\n\n\

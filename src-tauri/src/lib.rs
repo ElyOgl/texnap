@@ -102,6 +102,112 @@ fn write_temp_html(app: AppHandle, contents: String) -> Result<String, String> {
     Ok(path.to_string_lossy().into_owned())
 }
 
+// ---- F6: offline local model (download + status) ----
+
+/// Where the local model files live: app_data_dir/models/texify.
+fn local_model_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Couldn't resolve the app data directory: {e}"))?
+        .join("models")
+        .join("texify");
+    Ok(dir)
+}
+
+/// The texify fp16 model files + their sha256, pinned to an immutable HF commit.
+#[cfg(feature = "local")]
+const LOCAL_MODEL_FILES: [(&str, &str); 3] = [
+    ("encoder_model.onnx", "6083149d64fb17dcfacf85b6137c2cf316b33eb1c80a3fde58fcb869c3f17f46"),
+    ("decoder_model_merged.onnx", "4b9241793ee344c754944e79049f310173bf87902be6f3e85aeb4a538a5ae83f"),
+    ("tokenizer.json", "06506d8033a4080bba741ed86b416ef238cae52b169cb0045404d6032fd657c2"),
+];
+#[cfg(feature = "local")]
+const LOCAL_MODEL_BASE: &str =
+    "https://huggingface.co/Spedon/texify-fp16-onnx/resolve/791e50645b5557d1c3a4743bbf855d71a708e277";
+
+#[cfg(feature = "local")]
+async fn download_model_file(
+    app: &AppHandle,
+    name: &str,
+    expected_sha: &str,
+    index: usize,
+    count: usize,
+    dir: &std::path::Path,
+) -> Result<(), String> {
+    use futures_util::StreamExt as _;
+    use sha2::{Digest, Sha256};
+    use std::io::Write as _;
+
+    let dest = dir.join(name);
+    if dest.exists() {
+        return Ok(()); // already downloaded
+    }
+    let resp = reqwest::Client::new()
+        .get(format!("{LOCAL_MODEL_BASE}/{name}"))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("downloading {name} failed: HTTP {}", resp.status()));
+    }
+    let total = resp.content_length().unwrap_or(0);
+    let tmp = dest.with_extension("part");
+    let mut file = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+    let mut hasher = Sha256::new();
+    let mut received: u64 = 0;
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        hasher.update(&chunk);
+        received += chunk.len() as u64;
+        let _ = app.emit(
+            "local-model-progress",
+            serde_json::json!({ "file": name, "received": received, "total": total, "index": index, "count": count }),
+        );
+    }
+    file.flush().map_err(|e| e.to_string())?;
+    let got = format!("{:x}", hasher.finalize());
+    if got != expected_sha {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("checksum mismatch for {name} — download corrupted, please retry"));
+    }
+    std::fs::rename(&tmp, &dest).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Download the local model (~600 MB) into the app data dir, emitting
+/// `local-model-progress` events. Idempotent: skips files already present.
+#[tauri::command]
+async fn download_local_model(app: AppHandle) -> Result<(), String> {
+    #[cfg(feature = "local")]
+    {
+        let dir = local_model_dir(&app)?;
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        for (i, (name, sha)) in LOCAL_MODEL_FILES.iter().enumerate() {
+            download_model_file(&app, name, sha, i, LOCAL_MODEL_FILES.len(), &dir).await?;
+        }
+        Ok(())
+    }
+    #[cfg(not(feature = "local"))]
+    {
+        let _ = app;
+        Err("Offline OCR isn't included in this build.".into())
+    }
+}
+
+/// "ready" | "not-downloaded" (so the UI can show the right control).
+#[tauri::command]
+fn local_model_status(app: AppHandle) -> Result<String, String> {
+    let dir = local_model_dir(&app)?;
+    Ok(if ocr::local_model_downloaded(&dir) {
+        "ready".into()
+    } else {
+        "not-downloaded".into()
+    })
+}
+
 #[tauri::command]
 fn set_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
     let previous = config::current_shortcut(&app);
@@ -128,6 +234,26 @@ struct Transcription {
 
 #[tauri::command]
 async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transcription, String> {
+    // F6: the local model is keyless — route it on-device, off the key-based
+    // cloud chain. Runs on a blocking thread so inference doesn't stall the
+    // async runtime.
+    if config::active_provider(&app) == provider::Provider::Local {
+        let dir = local_model_dir(&app)?;
+        if !ocr::local_model_downloaded(&dir) {
+            return Err("The offline model isn't downloaded yet — get it in Settings (⌘,).".into());
+        }
+        let url = image_data_url.clone();
+        let latex = tauri::async_runtime::spawn_blocking(move || ocr::transcribe_local(&url, &dir))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
+        return Ok(Transcription {
+            latex,
+            provider_label: provider::Provider::Local.info().label,
+            fell_back_from: None,
+        });
+    }
+
     let chain = config::fallback_chain(&app);
     if chain.is_empty() {
         return Err(ocr::OcrError::MissingApiKey.to_string());
@@ -281,6 +407,8 @@ pub fn run() {
             read_image_as_base64,
             save_text_file,
             write_temp_html,
+            download_local_model,
+            local_model_status,
             config::get_config_status,
             config::list_providers,
             config::save_provider_key,

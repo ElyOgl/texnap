@@ -45,6 +45,12 @@ pub fn fallback_chain(app: &AppHandle) -> Vec<(Provider, String)> {
     core_config::fallback_chain(&read_stored(app))
 }
 
+/// The active provider (stored, or the default). Lets the OCR command route the
+/// local provider (F6) differently from the key-based cloud providers.
+pub fn active_provider(app: &AppHandle) -> Provider {
+    core_config::active_provider(&read_stored(app))
+}
+
 /// The active global capture shortcut (stored, or the default).
 pub fn current_shortcut(app: &AppHandle) -> String {
     read_stored(app)
