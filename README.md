@@ -5,9 +5,10 @@ region of your screen, and texnap transcribes the formula (or a whole
 theorem/proof block) into rigorous, compilable LaTeX — rendered right next to
 the source so you can check it at a glance.
 
-A small, fast, keyboard-first macOS app. Single-user, local, **bring your own
-API key** — nothing is sent anywhere except the provider you choose, and no
-secrets are shipped in the app.
+A small, fast, keyboard-first macOS app. Single-user and local: run it **fully
+offline with the built-in on-device model**, or **bring your own API key** for a
+cloud provider — either way nothing is sent anywhere except the provider you
+choose, and no secrets are shipped in the app.
 
 ## Features
 
@@ -16,13 +17,21 @@ secrets are shipped in the app.
 - **Paste or drag** a screenshot in too (⌘V / drag-and-drop / file picker).
 - **Mixed text + math** — whole lemma/proof blocks (bold, italic, lists, inline
   and display math) render correctly, not just bare formulas.
-- **Five OCR providers** — Google Gemini (free tier), SimpleTex, OpenRouter,
-  OpenAI, Anthropic — with **automatic fallback** if one hits its quota.
+- **Offline, on-device OCR** — a built-in local model that needs **no API key
+  and no network** (see [Offline mode](#offline-mode-on-device-ocr) below).
+- **Six OCR engines** — the offline local model plus Google Gemini (free tier),
+  SimpleTex, OpenRouter, OpenAI, and Anthropic — with **automatic fallback** to
+  the local model if a cloud provider hits its quota or you lose connection.
 - **Live editing** with KaTeX preview, one-key copy, and undo (⌘Z).
 - **Formula library** — every transcription is saved automatically; tag it,
   pin it, and search across your formulas (see [Library](#library) below).
+- **Revision sheets** — pick formulas from your library and export a printable
+  *fiche* (PDF) or a compilable `.tex` file (see [Revision sheets](#revision-sheets-fiches)).
 - **Accuracy check** (optional) — a second pass asks the model whether the
   LaTeX faithfully matches the source image.
+
+> The app interface is currently in **French** (other languages coming in a
+> later update). This README is in English.
 
 ## Install
 
@@ -59,6 +68,29 @@ On first run, pick a provider and paste an API key (stored locally on your Mac,
 never in the repo). Gemini has a free tier and is a good default —
 [get a key](https://aistudio.google.com/apikey).
 
+Don't want to deal with keys at all? Choose **Local (offline)** — see below.
+
+## Offline mode (on-device OCR)
+
+texnap ships with a **local OCR model that runs entirely on your Mac** — no API
+key, no quota, no network, nothing leaves the machine.
+
+1. Open **Settings** (⌘, — or click the **OCR · …** badge on the home screen).
+2. Pick **Local (hors-ligne)** in the provider dropdown.
+3. Click **Télécharger le modèle** once. The model (~600 MB) downloads with a
+   per-file progress bar; it's stored under
+   `~/Library/Application Support/fr.elyo.texnap/models/` and kept for good.
+4. Click **Utiliser ce modèle**. From then on, transcription runs on-device.
+
+The local engine is bundled into the app, so once the model is downloaded it
+works with no internet. texnap also **falls back to it automatically** when a
+cloud provider is unreachable or out of quota, so you're never stuck offline.
+
+Notes: the model is Apple-Silicon only (like the rest of the app); the first
+transcription after launch is a little slower while the model loads, then it's
+fast. The terminal CLI stays cloud-only (keeps it lightweight) — offline OCR is
+an app feature.
+
 ## Library
 
 Every transcription is **saved automatically** — no "save" button. Open the
@@ -91,6 +123,20 @@ formulas are never touched.
 Everything lives in `history.json` under
 `~/Library/Application Support/fr.elyo.texnap/` (next to your API key) — local
 to your Mac, never uploaded, kept across restarts, and shared with the CLI.
+
+## Revision sheets (fiches)
+
+Turn a selection of library formulas into a printable revision sheet — handy for
+an *anti-sèche* or a chapter recap.
+
+1. In the library, click **Créer une fiche**, tick the formulas you want
+   (or **Tout sélectionner**), then **Créer la fiche →**.
+2. Give it a title, choose 1–3 columns, and optionally **group by tag**.
+3. Export it:
+   - **Exporter PDF** — opens a clean, print-ready page in your browser; press
+     ⌘P → *Save as PDF*.
+   - **Exporter .tex** — saves a compilable LaTeX document you can drop into your
+     own notes or compile directly.
 
 ## Command line
 
