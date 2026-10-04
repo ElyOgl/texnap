@@ -1,10 +1,14 @@
 # texnap
 
 <p align="center">
-  <video src="https://github.com/ElyOgl/texnap/raw/main/assets/demo.mp4" controls muted width="640"></video>
+  <a href="https://github.com/ElyOgl/texnap/blob/main/assets/demo.mp4">
+    <img src="assets/demo-poster.png" alt="Watch the texnap demo" width="640">
+  </a>
 </p>
 
-> ▶️ **[Watch the demo](https://github.com/ElyOgl/texnap/raw/main/assets/demo.mp4)** — a quick tour of capturing math and getting LaTeX back. (If the player above doesn't load in your browser, use this link.)
+<p align="center">
+  ▶️ <b><a href="https://github.com/ElyOgl/texnap/blob/main/assets/demo.mp4">Watch the ~80-second demo</a></b> — a quick tour of capturing math and getting LaTeX back.
+</p>
 
 **Snap a screenshot of any math, get clean LaTeX.** Press a shortcut, select a
 region of your screen, and texnap transcribes the formula (or a whole
