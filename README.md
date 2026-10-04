@@ -174,7 +174,8 @@ configured provider if one hits its quota.
 
 | Key | Action |
 | --- | --- |
-| ⌃⌘M | Capture a screen region (customizable in Settings) |
+| ⌃⌘, | (AZERTY) Capture a screen region (customizable in Settings) |
+| ⌃⌘M | (QWERTY) Capture a screen region (customizable in Settings) |
 | ⌘V | Paste / new capture |
 | ⏎ | Transcribe |
 | ⌘C | Copy the LaTeX |
