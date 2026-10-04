@@ -1,5 +1,11 @@
 # texnap
 
+<p align="center">
+  <video src="https://github.com/ElyOgl/texnap/raw/main/assets/demo.mp4" controls muted width="640"></video>
+</p>
+
+> ▶️ **[Watch the demo](https://github.com/ElyOgl/texnap/raw/main/assets/demo.mp4)** — a quick tour of capturing math and getting LaTeX back. (If the player above doesn't load in your browser, use this link.)
+
 **Snap a screenshot of any math, get clean LaTeX.** Press a shortcut, select a
 region of your screen, and texnap transcribes the formula (or a whole
 theorem/proof block) into rigorous, compilable LaTeX — rendered right next to
