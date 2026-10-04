@@ -2,9 +2,9 @@
 
 <div align="center">
 
-[![Watch the texnap demo](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo-poster.png)](https://github.com/ElyOgl/texnap/blob/main/assets/demo.mp4)
+[![Watch the texnap demo](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo-poster.png)](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo.mp4)
 
-▶️ **[Watch the ~80-second demo](https://github.com/ElyOgl/texnap/blob/main/assets/demo.mp4)** — a quick tour of capturing math and getting LaTeX back.
+▶️ **[Watch the ~80-second demo](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo.mp4)** — a quick tour of capturing math and getting LaTeX back.
 
 </div>
 
