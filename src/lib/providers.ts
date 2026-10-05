@@ -11,4 +11,6 @@ export type ConfigStatus = {
   configured: boolean;
   activeProvider: string;
   savedProviders: string[];
+  /** Stored UI language code, or null when never chosen (auto-detect). */
+  language: string | null;
 };

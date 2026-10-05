@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { type HistoryEntry, relativeTime } from "../lib/history";
 import { TagEditor } from "./Tags";
 import { HintBar } from "./ui";
+import { useI18n } from "../lib/i18n";
 
 type Props = {
   onOpen: (entry: HistoryEntry) => void;
@@ -17,6 +18,7 @@ const tagsOf = (e: HistoryEntry) => e.tags ?? [];
 /// filterable by tag, with a pinned section on top. (Was HistoryPanel — the
 /// history *is* the library now; tagging/pinning keeps an entry past the cap.)
 export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
+  const { t, lang } = useI18n();
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -125,7 +127,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-mono text-[11px] text-ink-2">{entry.latex}</span>
           <span className="truncate text-[10.5px] text-ink-3">
-            {tagsOf(entry).join(", ") || entry.provider} · {relativeTime(entry.createdAt)}
+            {tagsOf(entry).join(", ") || entry.provider} · {relativeTime(entry.createdAt, lang)}
           </span>
         </span>
       </button>
@@ -140,7 +142,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
       key={entry.id}
       className="group flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-2 hover:border-line-2"
     >
-      <button onClick={() => onOpen(entry)} className="shrink-0" title="Ouvrir">
+      <button onClick={() => onOpen(entry)} className="shrink-0" title={t("library.open")}>
         <img
           src={entry.thumbnail}
           alt=""
@@ -158,13 +160,13 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
           compact
         />
         <span className="text-[10.5px] text-ink-3">
-          {entry.provider} · {relativeTime(entry.createdAt)}
+          {entry.provider} · {relativeTime(entry.createdAt, lang)}
         </span>
       </div>
       <div className="flex shrink-0 flex-col items-center gap-1.5">
         <button
           onClick={() => void togglePin(entry)}
-          title={entry.pinned ? "Désépingler" : "Épingler"}
+          title={entry.pinned ? t("library.unpin") : t("library.pin")}
           className={entry.pinned ? "text-accent" : "text-ink-3 opacity-0 hover:text-ink-2 group-hover:opacity-100"}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill={entry.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -176,7 +178,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
         <button
           onClick={() => void remove(entry.id)}
           className="text-ink-3 opacity-0 hover:text-ink-2 group-hover:opacity-100"
-          title="Retirer"
+          title={t("library.remove")}
         >
           ✕
         </button>
@@ -192,18 +194,18 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
             onClick={selecting ? cancelSelect : onClose}
             className="text-[11px] text-ink-3 hover:text-ink-2"
           >
-            {selecting ? "Annuler" : "‹ Retour"}
+            {selecting ? t("common.cancel") : t("common.back")}
           </button>
           <span className="text-[13px] font-medium text-ink">
-            {selecting ? "Sélection de formules" : "Bibliothèque"}
+            {selecting ? t("library.titleSelecting") : t("library.title")}
           </span>
           {selecting ? (
             <button onClick={selectAllShown} className="text-[11px] text-ink-3 hover:text-ink-2">
-              Tout sélectionner
+              {t("library.selectAll")}
             </button>
           ) : (entries?.length ?? 0) > 0 ? (
             <button onClick={() => setSelecting(true)} className="text-[11px] text-accent hover:brightness-110">
-              Créer une fiche
+              {t("library.createSheet")}
             </button>
           ) : (
             <span className="w-8" />
@@ -212,14 +214,14 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
 
         {!selecting && (entries?.length ?? 0) > 0 && (
           <div className="flex items-center justify-between text-[11px] text-ink-3">
-            <span>{filtered.length} enregistrée{filtered.length > 1 ? "s" : ""}</span>
+            <span>{t("library.savedCount", { count: filtered.length })}</span>
             {hasUncurated && (
               <button
                 onClick={() => void clearUncurated()}
                 className="hover:text-ink-2"
-                title="Supprime les entrées ni taguées ni épinglées (garde tes formules taguées ou épinglées)"
+                title={t("library.clearUncuratedTitle")}
               >
-                Effacer les non-tagués
+                {t("library.clearUncurated")}
               </button>
             )}
           </div>
@@ -229,7 +231,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
           ref={searchRef}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
-          placeholder="Rechercher une formule ou un tag…"
+          placeholder={t("library.search")}
           spellCheck={false}
           className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent/50"
         />
@@ -242,7 +244,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
                 activeTag === null ? "bg-accent text-accent-ink" : "bg-surface-3 text-ink-2 hover:text-ink"
               }`}
             >
-              Toutes
+              {t("library.allTags")}
             </button>
             {allTags.map((tag) => (
               <button
@@ -259,12 +261,10 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
         )}
 
         {entries === null ? (
-          <p className="text-[12px] text-ink-3">Chargement…</p>
+          <p className="text-[12px] text-ink-3">{t("library.loading")}</p>
         ) : filtered.length === 0 ? (
           <p className="py-8 text-center text-[12px] text-ink-3">
-            {entries.length === 0
-              ? "Aucune transcription pour l’instant. Elles apparaîtront ici."
-              : "Aucun résultat. Essaie une autre recherche ou un autre tag."}
+            {entries.length === 0 ? t("library.emptyNone") : t("library.emptyNoResult")}
           </p>
         ) : (
           <>
@@ -274,7 +274,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="text-accent">
                     <path d="M9 4v6l-2 4h10l-2 -4v-6z" />
                   </svg>
-                  Épinglées
+                  {t("library.pinned")}
                 </div>
                 {pinned.map(row)}
                 {rest.length > 0 && <div className="h-px bg-line" />}
@@ -287,20 +287,20 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
 
       {selecting ? (
         <div className="flex items-center justify-between border-t border-line bg-titlebar px-3.5 py-2.5">
-          <span className="text-[11px] text-ink-2">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
+          <span className="text-[11px] text-ink-2">{t("library.selectedCount", { count: selected.size })}</span>
           <button
             onClick={createSheet}
             disabled={selected.size === 0}
             className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-40"
           >
-            Créer la fiche →
+            {t("library.createSheetArrow")}
           </button>
         </div>
       ) : (
         <HintBar
           hints={[
-            { keys: ["⌘", "F"], label: "Rechercher" },
-            { keys: ["esc"], label: "Fermer", right: true },
+            { keys: ["⌘", "F"], label: t("hint.search") },
+            { keys: ["esc"], label: t("hint.close"), right: true },
           ]}
         />
       )}

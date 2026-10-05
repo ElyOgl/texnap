@@ -28,6 +28,10 @@ pub struct StoredConfig {
     pub keys: HashMap<String, String>,
     #[serde(default)]
     pub shortcut: Option<String>,
+    /// UI language code (e.g. "fr", "en"). `None` = never chosen, so the
+    /// frontend auto-detects from the OS locale. App-only, like `shortcut`.
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 /// The active provider from a stored config, defaulting to the free one
@@ -108,6 +112,7 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
             shortcut: None,
+            language: None,
         }
     }
 

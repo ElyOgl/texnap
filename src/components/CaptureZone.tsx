@@ -1,4 +1,5 @@
 import { Kbd } from "./ui";
+import { useI18n } from "../lib/i18n";
 
 type Props = {
   isDragging: boolean;
@@ -11,11 +12,12 @@ type Props = {
 // Idle view. Capture itself (paste / drop / pick) lives in useImageCapture at
 // the App level so it works in any view — this is just the drop-zone surface.
 export function CaptureZone({ isDragging, onPick, providerLabel, onOpenSettings }: Props) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-3">
       <div className="pt-1 text-center">
         <div className="text-[15px] font-semibold text-ink">texnap</div>
-        <div className="mt-0.5 text-[11px] text-ink-3">capture → LaTeX</div>
+        <div className="mt-0.5 text-[11px] text-ink-3">{t("captureZone.subtitle")}</div>
       </div>
       <button
         type="button"
@@ -41,10 +43,10 @@ export function CaptureZone({ isDragging, onPick, providerLabel, onOpenSettings 
           <path d="m7 9 5-5 5 5" />
           <path d="M5 20h14" />
         </svg>
-        <div className="text-[13px] font-medium text-ink">Dépose une capture de formule</div>
+        <div className="text-[13px] font-medium text-ink">{t("captureZone.drop")}</div>
         <div className="text-[12px] text-ink-3">
-          ou appuie sur <Kbd>⌘</Kbd>
-          <Kbd>V</Kbd> pour coller depuis le presse-papier
+          {t("captureZone.pastePre")} <Kbd>⌘</Kbd>
+          <Kbd>V</Kbd> {t("captureZone.pastePost")}
         </div>
       </button>
 
@@ -52,7 +54,7 @@ export function CaptureZone({ isDragging, onPick, providerLabel, onOpenSettings 
         <button
           type="button"
           onClick={onOpenSettings}
-          title="Changer de moteur OCR"
+          title={t("captureZone.changeEngine")}
           className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface-3 px-2 py-1 text-[11px] text-ink-2 transition-colors hover:border-line-2 hover:text-ink"
         >
           OCR · {providerLabel ?? "…"}
@@ -60,7 +62,7 @@ export function CaptureZone({ isDragging, onPick, providerLabel, onOpenSettings 
             <path d="m9 18 6-6-6-6" />
           </svg>
         </button>
-        <span className="text-[11px] text-ink-3">Prêt</span>
+        <span className="text-[11px] text-ink-3">{t("captureZone.ready")}</span>
       </div>
     </div>
   );

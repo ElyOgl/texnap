@@ -18,12 +18,18 @@ export function isAllowedImage(blob: Blob): boolean {
   return (ALLOWED_MIME_TYPES as readonly string[]).includes(blob.type);
 }
 
-export function validateBlob(blob: Blob): string | null {
+// A structured validation failure the UI layer localizes (so the message is in
+// the user's language rather than hardcoded English here).
+export type BlobError =
+  | { code: "unsupportedType"; type: string }
+  | { code: "tooLarge"; mb: string };
+
+export function validateBlob(blob: Blob): BlobError | null {
   if (!isAllowedImage(blob)) {
-    return `Unsupported file type "${blob.type || "unknown"}" — expected PNG, JPEG, WEBP, or GIF.`;
+    return { code: "unsupportedType", type: blob.type || "unknown" };
   }
   if (blob.size > MAX_BYTES) {
-    return `Image is ${(blob.size / 1_048_576).toFixed(1)} MB, which is over the 10 MB limit.`;
+    return { code: "tooLarge", mb: (blob.size / 1_048_576).toFixed(1) };
   }
   return null;
 }

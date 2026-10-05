@@ -37,13 +37,19 @@ export function makeThumbnail(dataUrl: string, maxWidth = 280): Promise<string> 
   });
 }
 
-export function relativeTime(ms: number): string {
+import type { Lang } from "./i18n/types";
+
+// Locale-aware relative time. Uses the platform Intl.RelativeTimeFormat for
+// minutes/hours/days (correct for any language); the sub-minute case has its own
+// short phrase per language.
+export function relativeTime(ms: number, lang: Lang = "fr"): string {
   const s = Math.round((Date.now() - ms) / 1000);
-  if (s < 60) return "just now";
+  if (s < 60) return lang === "en" ? "just now" : "à l'instant";
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto" });
   const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return rtf.format(-m, "minute");
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return rtf.format(-h, "hour");
   const d = Math.round(h / 24);
-  return `${d}d ago`;
+  return rtf.format(-d, "day");
 }

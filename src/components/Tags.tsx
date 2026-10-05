@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import { useI18n } from "../lib/i18n";
 
 type Props = {
   tags: string[];
@@ -13,6 +14,7 @@ type Props = {
 /// Chips for an entry's tags plus an inline "+ tag" input with autocomplete.
 /// Shared by the library panel (per entry) and the fresh-result view.
 export function TagEditor({ tags, suggestions = [], onChange, compact }: Props) {
+  const { t } = useI18n();
   const [adding, setAdding] = useState(false);
   const [value, setValue] = useState("");
   const listId = useId();
@@ -51,7 +53,7 @@ export function TagEditor({ tags, suggestions = [], onChange, compact }: Props) 
             type="button"
             onClick={() => remove(tag)}
             className="text-ink-3 hover:text-ink"
-            aria-label={`Retirer le tag ${tag}`}
+            aria-label={t("tags.remove", { tag })}
           >
             ×
           </button>
@@ -80,7 +82,7 @@ export function TagEditor({ tags, suggestions = [], onChange, compact }: Props) 
               add();
               setAdding(false);
             }}
-            placeholder="tag…"
+            placeholder={t("tags.placeholder")}
             className={`w-24 rounded-full border border-line-2 bg-surface-2 text-ink outline-none focus:border-accent/50 ${chip}`}
           />
           <datalist id={listId}>
@@ -95,7 +97,7 @@ export function TagEditor({ tags, suggestions = [], onChange, compact }: Props) 
           onClick={() => setAdding(true)}
           className={`flex items-center gap-1 rounded-full border border-dashed border-line-2 text-ink-3 hover:text-ink-2 ${chip}`}
         >
-          + tag
+          {t("tags.add")}
         </button>
       )}
     </div>

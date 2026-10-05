@@ -42,6 +42,10 @@ describe("groupForSheet", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].tag).toBe("");
   });
+  it("uses the provided untagged label", () => {
+    const groups = groupForSheet([entry("a", "x", ["Algebra"]), entry("b", "y")], true, "Untagged");
+    expect(groups.map((g) => g.tag)).toEqual(["Algebra", "Untagged"]);
+  });
 });
 
 describe("buildTex", () => {
@@ -54,5 +58,10 @@ describe("buildTex", () => {
     expect(tex).toContain("\\section*{Complexes}");
     expect(tex).toContain("e^{i\\pi} = -1");
     expect(tex.trimEnd().endsWith("\\end{document}")).toBe(true);
+  });
+  it("defaults to french babel and honors an override", () => {
+    const groups = groupForSheet([entry("a", "x")], false);
+    expect(buildTex("t", groups)).toContain("\\usepackage[french]{babel}");
+    expect(buildTex("t", groups, "english")).toContain("\\usepackage[english]{babel}");
   });
 });

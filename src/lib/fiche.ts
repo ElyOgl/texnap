@@ -5,14 +5,19 @@ export type Group = { tag: string; entries: HistoryEntry[] };
 const UNTAGGED = "Sans tag";
 
 /// Group entries for the sheet. When `grouped`, bucket by each entry's first
-/// tag (entries keep their order; untagged ones go last under "Sans tag"). When
-/// not grouped, one bucket with everything.
-export function groupForSheet(entries: HistoryEntry[], grouped: boolean): Group[] {
+/// tag (entries keep their order; untagged ones go last under the `untagged`
+/// label). When not grouped, one bucket with everything. `untagged` defaults to
+/// French so callers without a locale (and tests) keep the old behavior.
+export function groupForSheet(
+  entries: HistoryEntry[],
+  grouped: boolean,
+  untagged: string = UNTAGGED,
+): Group[] {
   if (!grouped) return entries.length ? [{ tag: "", entries }] : [];
   const order: string[] = [];
   const buckets = new Map<string, HistoryEntry[]>();
   for (const e of entries) {
-    const tag = e.tags?.[0] ?? UNTAGGED;
+    const tag = e.tags?.[0] ?? untagged;
     if (!buckets.has(tag)) {
       buckets.set(tag, []);
       order.push(tag);
@@ -20,7 +25,7 @@ export function groupForSheet(entries: HistoryEntry[], grouped: boolean): Group[
     buckets.get(tag)!.push(e);
   }
   // Untagged bucket sorts last.
-  order.sort((a, b) => (a === UNTAGGED ? 1 : 0) - (b === UNTAGGED ? 1 : 0));
+  order.sort((a, b) => (a === untagged ? 1 : 0) - (b === untagged ? 1 : 0));
   return order.map((tag) => ({ tag, entries: buckets.get(tag)! }));
 }
 
@@ -43,12 +48,14 @@ export function wrapForTex(latex: string): string {
 }
 
 /// Build a compilable standalone .tex document from the selected entries.
-export function buildTex(title: string, groups: Group[]): string {
+/// `babelLang` is the babel option (e.g. "french"/"english"); defaults to French
+/// so callers without a locale (and tests) keep the old behavior.
+export function buildTex(title: string, groups: Group[], babelLang: string = "french"): string {
   const head = [
     "\\documentclass[a4paper,11pt]{article}",
     "\\usepackage[utf8]{inputenc}",
     "\\usepackage[T1]{fontenc}",
-    "\\usepackage[french]{babel}",
+    `\\usepackage[${babelLang}]{babel}`,
     "\\usepackage{amsmath,amssymb}",
     "\\usepackage[margin=2cm]{geometry}",
     "",

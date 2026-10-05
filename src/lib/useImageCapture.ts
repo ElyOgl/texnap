@@ -8,6 +8,7 @@ import {
   looksLikeImagePath,
   validateBlob,
 } from "./image";
+import { useI18n } from "./i18n";
 
 // Capture works in any view (idle or showing a result), so this lives above
 // the views rather than inside the idle-only drop zone — pasting a new
@@ -23,12 +24,13 @@ export function useImageCapture(
   onError: (message: string) => void,
   enabled: boolean,
 ) {
+  const { t } = useI18n();
   const [isDragging, setIsDragging] = useState(false);
 
   const captureFromPath = useCallback(
     async (path: string) => {
       if (!looksLikeImagePath(path)) {
-        onError(`"${path.split("/").pop()}" doesn't look like an image.`);
+        onError(t("capture.notImage", { name: path.split("/").pop() ?? "" }));
         return;
       }
       try {
@@ -45,7 +47,7 @@ export function useImageCapture(
         onError(String(err));
       }
     },
-    [onCapture, onError],
+    [onCapture, onError, t],
   );
 
   const pickFile = useCallback(async () => {
@@ -69,7 +71,11 @@ export function useImageCapture(
           if (!blob) continue;
           const error = validateBlob(blob);
           if (error) {
-            onError(error);
+            onError(
+              error.code === "tooLarge"
+                ? t("capture.tooLarge", { mb: error.mb })
+                : t("capture.unsupportedType", { type: error.type }),
+            );
             return;
           }
           const dataUrl = await blobToDataUrl(blob);
@@ -84,7 +90,7 @@ export function useImageCapture(
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [enabled, onCapture, onError]);
+  }, [enabled, onCapture, onError, t]);
 
   useEffect(() => {
     if (!enabled) {

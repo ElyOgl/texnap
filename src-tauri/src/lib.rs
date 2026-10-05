@@ -437,6 +437,8 @@ pub fn run() {
             config::save_provider_key,
             config::set_active_provider,
             config::get_shortcut,
+            config::get_language,
+            config::set_language,
             set_shortcut,
             history::get_history,
             history::add_history_entry,

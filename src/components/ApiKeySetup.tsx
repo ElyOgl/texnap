@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ConfigStatus, ProviderInfo } from "../lib/providers";
 import { HintBar } from "./ui";
+import { useI18n } from "../lib/i18n";
+import { providerCopy } from "../lib/i18n/providers";
 
 type Props = {
   onDone: () => void;
@@ -53,6 +55,7 @@ function prettyShortcut(accel: string): string {
 }
 
 export function ApiKeySetup({ onDone, onCancel }: Props) {
+  const { t, lang, setLang } = useI18n();
   const [providers, setProviders] = useState<ProviderInfo[] | null>(null);
   const [savedProviders, setSavedProviders] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -136,7 +139,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
     };
   }, [localStatus]);
 
-  const DL_LABELS = ["Encodeur", "Décodeur", "Vocabulaire"];
+  const DL_LABELS = [t("apiKey.file.encoder"), t("apiKey.file.decoder"), t("apiKey.file.vocab")];
   const downloadModel = async () => {
     setLocalError(null);
     setDlFiles(DL_LABELS.map((name) => ({ name, received: 0, total: 0 })));
@@ -201,7 +204,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   });
 
   if (!providers || !selected) {
-    return <p className="p-3.5 text-[12px] text-ink-3">Chargement des fournisseurs…</p>;
+    return <p className="p-3.5 text-[12px] text-ink-3">{t("apiKey.loading")}</p>;
   }
 
   return (
@@ -209,11 +212,11 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-3.5">
         {onCancel && (
           <button onClick={onCancel} className="-mb-1 self-start text-[11px] text-ink-3 hover:text-ink-2">
-            ‹ Retour
+            {t("common.back")}
           </button>
         )}
         <div>
-          <label className="mb-1.5 block text-[11px] text-ink-3">Fournisseur OCR</label>
+          <label className="mb-1.5 block text-[11px] text-ink-3">{t("apiKey.providerLabel")}</label>
           <div className="relative">
             <select
               value={selected}
@@ -226,9 +229,9 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.label}
-                  {p.freeTier ? " — offre gratuite" : ""}
-                  {savedProviders.includes(p.id) ? " (clé enregistrée)" : ""}
+                  {providerCopy[lang][p.id]?.label ?? p.label}
+                  {p.freeTier ? t("apiKey.freeTier") : ""}
+                  {savedProviders.includes(p.id) ? t("apiKey.keySaved") : ""}
                 </option>
               ))}
             </select>
@@ -244,7 +247,11 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               <path d="m6 9 6 6 6-6" />
             </svg>
           </div>
-          {info && <p className="mt-1.5 text-[11px] text-ink-3">{info.note}</p>}
+          {info && (
+            <p className="mt-1.5 text-[11px] text-ink-3">
+              {providerCopy[lang][info.id]?.note ?? info.note}
+            </p>
+          )}
         </div>
 
         {isLocal ? (
@@ -255,25 +262,27 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                   <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" />
                 </svg>
                 <div className="flex min-w-0 flex-col">
-                  <span className="text-[12.5px] text-ink">Étape 3 — Modèle prêt, transcription hors-ligne</span>
-                  <span className="text-[10.5px] text-ink-3">Aucune clé requise · tourne sur ton Mac</span>
+                  <span className="text-[12.5px] text-ink">{t("apiKey.local.readyTitle")}</span>
+                  <span className="text-[10.5px] text-ink-3">{t("apiKey.local.readySubtitle")}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => void useLocal()}
                   className="ml-auto shrink-0 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
                 >
-                  Utiliser ce modèle
+                  {t("apiKey.local.use")}
                 </button>
               </div>
             ) : localStatus === "downloading" ? (
               <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 p-3">
-                <span className="text-[12px] text-ink-2">Étape 2 — Téléchargement du modèle…</span>
+                <span className="text-[12px] text-ink-2">{t("apiKey.local.downloading")}</span>
                 {dlFiles.map((f) => (
                   <div key={f.name} className="flex flex-col gap-1">
                     <div className="flex items-center justify-between text-[10.5px] text-ink-3">
                       <span>{f.name}</span>
-                      <span className="font-mono">{f.total ? `${mb(f.received)} / ${mb(f.total)} Mo` : "…"}</span>
+                      <span className="font-mono">
+                        {f.total ? t("apiKey.mbProgress", { received: mb(f.received), total: mb(f.total) }) : "…"}
+                      </span>
                     </div>
                     <div className="h-1 overflow-hidden rounded bg-surface-3">
                       <div
@@ -287,32 +296,38 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             ) : (
               <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface-2 p-3">
                 <span className="text-[12px] leading-relaxed text-ink-2">
-                  Étape 1 — Tourne sur ton Mac, <span className="text-ink">pas de clé, pas de quota, hors-ligne</span>. Télécharge un modèle (~600 Mo) une seule fois.
+                  {t("apiKey.local.introPre")}
+                  <span className="text-ink">{t("apiKey.local.introEm")}</span>
+                  {t("apiKey.local.introPost")}
                 </span>
                 <button
                   type="button"
                   onClick={() => void downloadModel()}
                   className="self-start rounded-md bg-accent px-3.5 py-2 text-[12px] font-medium text-accent-ink hover:brightness-110"
                 >
-                  Télécharger le modèle (~600 Mo)
+                  {t("apiKey.local.download")}
                 </button>
               </div>
             )}
             {localError && <p className="mt-1.5 text-[11px] text-red-400">{localError}</p>}
-            <p className="mt-1.5 text-[11px] text-ink-3">Hors connexion, texnap bascule automatiquement sur ce modèle.</p>
+            <p className="mt-1.5 text-[11px] text-ink-3">{t("apiKey.local.autoHint")}</p>
           </div>
         ) : (
         <div>
           <label className="mb-1.5 block text-[11px] text-ink-3">
-            Clé API
-            {alreadySaved && <span className="text-ink-2"> — une clé est déjà enregistrée</span>}
+            {t("apiKey.keyLabel")}
+            {alreadySaved && <span className="text-ink-2">{t("apiKey.keyAlreadySaved")}</span>}
           </label>
           <div className="relative">
             <input
               type={show ? "text" : "password"}
               value={key}
               onChange={(e) => setKey(e.currentTarget.value)}
-              placeholder={alreadySaved ? "Laisser vide pour garder la clé enregistrée" : info?.keyPlaceholder}
+              placeholder={
+                alreadySaved
+                  ? t("apiKey.keyPlaceholderSaved")
+                  : providerCopy[lang][selected]?.keyPlaceholder ?? info?.keyPlaceholder
+              }
               spellCheck={false}
               className="w-full rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5 pr-16 font-mono text-[12px] text-ink outline-none focus:border-accent/50"
             />
@@ -321,25 +336,25 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               onClick={() => setShow((s) => !s)}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-ink-3 hover:text-ink-2"
             >
-              {show ? "Masquer" : "Afficher"}
+              {show ? t("apiKey.hide") : t("apiKey.show")}
             </button>
           </div>
           <p className="mt-1.5 text-[11px] text-ink-3">
             {info && (
               <a href={info.getKeyUrl} target="_blank" rel="noreferrer" className="underline hover:text-ink-2">
-                Obtenir une clé {info.label}
+                {t("apiKey.getKey", { label: info.label })}
               </a>
             )}
-            {" · stockée localement sur ce Mac, jamais dans le dépôt."}
+            {t("apiKey.keyHintSuffix")}
           </p>
         </div>
         )}
 
         <div className="border-t border-line pt-3">
-          <label className="mb-1.5 block text-[11px] text-ink-3">Raccourci de capture global</label>
+          <label className="mb-1.5 block text-[11px] text-ink-3">{t("apiKey.shortcutLabel")}</label>
           <div className="flex items-center gap-2">
             <span className="rounded-md border border-line-2 bg-surface-2 px-2.5 py-1.5 font-mono text-[12px] text-ink">
-              {recording ? "Appuie sur les touches…" : shortcutLabel ?? "—"}
+              {recording ? t("apiKey.shortcutRecording") : shortcutLabel ?? "—"}
             </span>
             <button
               type="button"
@@ -349,29 +364,39 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               }}
               className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink"
             >
-              {recording ? "Annuler" : "Modifier"}
+              {recording ? t("common.cancel") : t("apiKey.shortcutEdit")}
             </button>
           </div>
           <p className="mt-1.5 text-[11px] text-ink-3">
-            {recording
-              ? "Appuie sur une combinaison avec un modificateur (⌘/⌃/⌥/⇧), ou Échap pour annuler."
-              : "Capture une région de l'écran depuis n'importe où, puis la transcrit. Nécessite l'autorisation « Enregistrement de l'écran » de macOS."}
+            {recording ? t("apiKey.shortcutHintRecording") : t("apiKey.shortcutHintIdle")}
           </p>
           {shortcutError && <p className="mt-1 text-[11px] text-red-400">{shortcutError}</p>}
         </div>
 
         <div className="border-t border-line pt-3">
-          <label className="mb-1.5 block text-[11px] text-ink-3">Langue</label>
+          <label className="mb-1.5 block text-[11px] text-ink-3">{t("apiKey.langLabel")}</label>
           <div className="relative">
             <select
-              value="fr"
-              disabled
-              className="w-full appearance-none rounded-lg border border-line-2 bg-surface-2 px-3 py-2 text-[13px] text-ink opacity-80 outline-none"
+              value={lang}
+              onChange={(e) => setLang(e.currentTarget.value as "fr" | "en")}
+              className="w-full appearance-none rounded-lg border border-line-2 bg-surface-2 px-3 py-2 pr-9 text-[13px] text-ink outline-none focus:border-accent/50"
             >
               <option value="fr">Français</option>
+              <option value="en">English</option>
             </select>
+            <svg
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-3"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-3">D'autres langues arriveront dans une mise à jour dédiée.</p>
+          <p className="mt-1.5 text-[11px] text-ink-3">{t("apiKey.langHint")}</p>
         </div>
 
         {error && <p className="text-[12px] text-red-400">{error}</p>}
@@ -395,7 +420,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               }}
               className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink"
             >
-              Confirmer
+              {t("apiKey.confirm")}
             </button>
           )}
           {!isLocal && (
@@ -405,7 +430,11 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               disabled={busy || !canSubmit}
               className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-50"
             >
-              {busy ? "Enregistrement…" : alreadySaved && key.trim().length === 0 ? "Utiliser ce fournisseur" : "Enregistrer la clé"}
+              {busy
+                ? t("apiKey.saving")
+                : alreadySaved && key.trim().length === 0
+                  ? t("apiKey.useProvider")
+                  : t("apiKey.saveKey")}
               <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘⏎</span>
             </button>
           )}
@@ -414,8 +443,8 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
 
       <HintBar
         hints={[
-          { keys: ["⌘", "⏎"], label: "Enregistrer" },
-          ...(onCancel ? [{ keys: ["esc"], label: "Fermer", right: true }] : []),
+          { keys: ["⌘", "⏎"], label: t("hint.save") },
+          ...(onCancel ? [{ keys: ["esc"], label: t("hint.close"), right: true }] : []),
         ]}
       />
     </div>

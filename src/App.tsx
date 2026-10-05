@@ -8,6 +8,7 @@ import { LibraryPanel } from "./components/LibraryPanel";
 import { FichePanel } from "./components/FichePanel";
 import { HintBar } from "./components/ui";
 import { useImageCapture } from "./lib/useImageCapture";
+import { useI18n } from "./lib/i18n";
 import { isEditableTarget } from "./lib/dom";
 import { historyReducer, initialHistory } from "./lib/session";
 import { type HistoryEntry, makeThumbnail } from "./lib/history";
@@ -16,6 +17,7 @@ import type { ConfigStatus, ProviderInfo } from "./lib/providers";
 import "./App.css";
 
 function App() {
+  const { t } = useI18n();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [activeProviderLabel, setActiveProviderLabel] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -136,7 +138,7 @@ function App() {
           <>
             <button
               onClick={() => setShowHistory(true)}
-              title="Bibliothèque"
+              title={t("header.library")}
               className="text-ink-3 hover:text-ink-2"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -145,7 +147,7 @@ function App() {
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              title="Réglages OCR (⌘,)"
+              title={t("header.settings")}
               className="text-ink-3 hover:text-ink-2"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -165,7 +167,7 @@ function App() {
 
       <div className="flex min-h-0 flex-1 flex-col">
         {configured === null ? (
-          <p className="p-3.5 text-[12px] text-ink-3">Vérification de la configuration…</p>
+          <p className="p-3.5 text-[12px] text-ink-3">{t("app.checkingConfig")}</p>
         ) : configured === false || showSettings ? (
           <ApiKeySetup
             onDone={settingsDone}
@@ -222,9 +224,9 @@ function App() {
             </div>
             <HintBar
               hints={[
-                { keys: ["⌘", "V"], label: "Coller" },
-                ...(history.past.length > 0 ? [{ keys: ["⌘", "Z"], label: "Annuler" }] : []),
-                { keys: ["⌘", ","], label: "Réglages", right: true },
+                { keys: ["⌘", "V"], label: t("hint.paste") },
+                ...(history.past.length > 0 ? [{ keys: ["⌘", "Z"], label: t("hint.undo") }] : []),
+                { keys: ["⌘", ","], label: t("hint.settings"), right: true },
               ]}
             />
           </div>

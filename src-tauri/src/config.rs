@@ -70,12 +70,42 @@ pub fn get_shortcut(app: AppHandle) -> String {
     current_shortcut(&app)
 }
 
+/// The stored UI language, or `None` when the user has never chosen one (the
+/// frontend then auto-detects from the OS locale). App-only, like the shortcut.
+pub fn current_language(app: &AppHandle) -> Option<String> {
+    read_stored(app)
+        .language
+        .filter(|l| !l.trim().is_empty())
+}
+
+pub fn persist_language(app: &AppHandle, language: &str) -> Result<(), String> {
+    let mut stored = read_stored(app);
+    stored.language = Some(language.to_string());
+    write_stored(app, &stored)
+}
+
+#[tauri::command]
+pub fn get_language(app: AppHandle) -> Option<String> {
+    current_language(&app)
+}
+
+#[tauri::command]
+pub fn set_language(app: AppHandle, language: String) -> Result<(), String> {
+    let trimmed = language.trim();
+    if trimmed.is_empty() {
+        return Err("Language can't be empty".into());
+    }
+    persist_language(&app, trimmed)
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigStatus {
     pub configured: bool,
     pub active_provider: &'static str,
     pub saved_providers: Vec<&'static str>,
+    /// Stored UI language, or `None` (never chosen → frontend auto-detects).
+    pub language: Option<String>,
 }
 
 #[tauri::command]
@@ -92,6 +122,7 @@ pub fn get_config_status(app: AppHandle) -> ConfigStatus {
             .filter(|p| core_config::key_for(&stored, **p).is_some())
             .map(|p| p.as_str())
             .collect(),
+        language: stored.language.filter(|l| !l.trim().is_empty()),
     }
 }
 
