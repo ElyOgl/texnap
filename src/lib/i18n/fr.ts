@@ -95,6 +95,12 @@ export const fr: Record<TKey, Entry> = {
   "capture.tooLarge": "L'image fait {mb} Mo, au-delà de la limite de 10 Mo.",
   "capture.notImage": "« {name} » ne ressemble pas à une image.",
 
+  // Naming + plain-language explanation
+  "name.suggested": "Nom suggéré",
+  "explain.button": "Langage courant",
+  "explain.loading": "Explication…",
+  "explain.title": "Reformuler cet énoncé en langage courant",
+
   // Tags
   "tags.remove": "Retirer le tag {tag}",
   "tags.placeholder": "tag…",

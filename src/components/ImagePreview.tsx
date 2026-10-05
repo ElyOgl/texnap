@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { renderLatex } from "../lib/latex";
@@ -24,15 +24,28 @@ type Props = {
   onEntryTags?: (tags: string[]) => void;
 };
 
+type NameInfo = {
+  /** true = an established standard name; false = a suggested mnemonic name. */
+  known: boolean;
+  name: string;
+};
+
 type Transcription = {
   latex: string;
   providerLabel: string;
   fellBackFrom: string | null;
+  /** Cloud-only: produced in the same request as the LaTeX (no extra call). */
+  name: NameInfo | null;
 };
 
 type Verdict = {
   level: "match" | "minor" | "mismatch" | "unknown";
   note: string;
+  providerLabel: string;
+};
+
+type Explanation = {
+  text: string;
   providerLabel: string;
 };
 
@@ -47,7 +60,7 @@ function classifyError(raw: string): TKey | null {
 }
 
 export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChange, onClear, entryTags, onEntryTags }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { image, latex, provider, seconds } = session;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,16 +68,28 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
   const [fellBackFrom, setFellBackFrom] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  // Name (folded into the transcription result) + on-demand plain-language explanation.
+  const [name, setName] = useState<NameInfo | null>(null);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explaining, setExplaining] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
+  // Guards async name/explain results against a newer capture arriving meanwhile.
+  const imageIdRef = useRef(image.id);
 
   // A new capture (or an undo/redo) is a different image — drop any transient
   // state tied to the previous one.
   useEffect(() => {
+    imageIdRef.current = image.id;
     setError(null);
     setCopied(false);
     setLoading(false);
     setFellBackFrom(null);
     setVerifying(false);
     setVerdict(null);
+    setName(null);
+    setExplanation(null);
+    setExplaining(false);
+    setExplainError(null);
   }, [image.id]);
 
   // Editing the LaTeX invalidates a prior verdict.
@@ -82,8 +107,13 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
     try {
       const result = await invoke<Transcription>("ocr_transcribe", {
         imageDataUrl: image.dataUrl,
+        lang,
       });
       setFellBackFrom(result.fellBackFrom);
+      // The name comes folded into the same response (no extra API call).
+      if (imageIdRef.current === startedForImage) {
+        setName(result.name && result.name.name.trim() ? result.name : null);
+      }
       onResult(
         startedForImage,
         result.latex,
@@ -94,6 +124,26 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
       setError(String(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // On-demand: reformulate the statement in plain language (selected UI language).
+  const explain = async () => {
+    if (!latex) return;
+    setExplaining(true);
+    setExplanation(null);
+    setExplainError(null);
+    try {
+      const r = await invoke<Explanation>("ocr_explain", {
+        imageDataUrl: image.dataUrl,
+        latex,
+        lang,
+      });
+      setExplanation(r.text);
+    } catch (err) {
+      setExplainError(String(err));
+    } finally {
+      setExplaining(false);
     }
   };
 
@@ -195,6 +245,37 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
 
         {!loading && latex && (
           <>
+            {name && name.name && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-2 px-3 py-2">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`shrink-0 ${name.known ? "text-accent" : "text-ink-3"}`}
+                >
+                  {name.known ? (
+                    <>
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </>
+                  ) : (
+                    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  )}
+                </svg>
+                <span className="flex min-w-0 flex-col">
+                  {!name.known && (
+                    <span className="text-[9.5px] uppercase tracking-wide text-ink-3">{t("name.suggested")}</span>
+                  )}
+                  <span className="truncate text-[12.5px] font-medium text-ink">{name.name}</span>
+                </span>
+              </div>
+            )}
+
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-ink-3">
                 <span>{t("preview.render")}</span>
@@ -284,7 +365,30 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                         : verdict.note}
                 </span>
               )}
+              {/* Plain-language reformulation — bottom-right. */}
+              <button
+                type="button"
+                onClick={() => void explain()}
+                disabled={explaining}
+                title={t("explain.title")}
+                className="ml-auto flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                {explaining ? t("explain.loading") : t("explain.button")}
+              </button>
             </div>
+
+            {(explanation || explainError) && (
+              <div className="rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed">
+                {explainError ? (
+                  <span className="text-red-400">{explainError}</span>
+                ) : (
+                  <span className="text-ink-2">{explanation}</span>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

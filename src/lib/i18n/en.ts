@@ -96,6 +96,12 @@ export const en = {
   "capture.tooLarge": "Image is {mb} MB, which is over the 10 MB limit.",
   "capture.notImage": "“{name}” doesn't look like an image.",
 
+  // Naming + plain-language explanation
+  "name.suggested": "Suggested name",
+  "explain.button": "Plain language",
+  "explain.loading": "Explaining…",
+  "explain.title": "Reformulate this statement in plain words",
+
   // Tags
   "tags.remove": "Remove tag {tag}",
   "tags.placeholder": "tag…",

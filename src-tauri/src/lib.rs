@@ -222,6 +222,14 @@ fn set_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+struct NameOut {
+    /// true = an established standard name; false = a suggested mnemonic name.
+    known: bool,
+    name: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Transcription {
     latex: String,
     /// Which provider actually produced this — with five providers and
@@ -230,6 +238,13 @@ struct Transcription {
     /// Set when the originally-active provider failed and a fallback answered,
     /// so the UI can say "X was unavailable — answered by <provider_label>".
     fell_back_from: Option<&'static str>,
+    /// Cloud-only: a (known or suggested) name for the result, produced in the
+    /// same request as the LaTeX. `None` for the local model / SimpleTex.
+    name: Option<NameOut>,
+}
+
+fn to_name_out(name: Option<(bool, String)>) -> Option<NameOut> {
+    name.map(|(known, name)| NameOut { known, name })
 }
 
 // F6: run the on-device model off the async runtime (inference is CPU-heavy).
@@ -246,16 +261,21 @@ async fn transcribe_local_in_app(app: &AppHandle, image_data_url: &str) -> Resul
 }
 
 #[tauri::command]
-async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transcription, String> {
+async fn ocr_transcribe(
+    app: AppHandle,
+    image_data_url: String,
+    lang: String,
+) -> Result<Transcription, String> {
     let local_label = provider::Provider::Local.info().label;
     let local_ready = local_model_dir(&app)
         .map(|d| ocr::local_model_downloaded(&d))
         .unwrap_or(false);
 
-    // The user explicitly picked the local model → run on-device (keyless).
+    // The user explicitly picked the local model → run on-device (keyless). No
+    // name: naming is cloud-only.
     if config::active_provider(&app) == provider::Provider::Local {
         let latex = transcribe_local_in_app(&app, &image_data_url).await?;
-        return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None });
+        return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None, name: None });
     }
 
     let chain = config::fallback_chain(&app);
@@ -263,21 +283,23 @@ async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transc
         // No cloud key configured — use the local model if it's downloaded.
         if local_ready {
             let latex = transcribe_local_in_app(&app, &image_data_url).await?;
-            return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None });
+            return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None, name: None });
         }
         return Err(ocr::OcrError::MissingApiKey.to_string());
     }
 
     let last = chain.len() - 1;
     for (idx, (provider, api_key)) in chain.iter().enumerate() {
-        match ocr::transcribe_to_latex(*provider, &image_data_url, api_key).await {
-            Ok(latex) => {
+        // Transcription + naming in one request (naming adds no extra API call).
+        match ocr::transcribe_and_name(*provider, &image_data_url, api_key, &lang).await {
+            Ok((latex, name)) => {
                 return Ok(Transcription {
                     latex,
                     provider_label: provider.info().label,
                     // chain[0] is the originally-active provider; if we're past
                     // it, we fell back from there.
                     fell_back_from: (idx > 0).then(|| chain[0].0.info().label),
+                    name: to_name_out(name),
                 });
             }
             // Only fall through on a retryable failure with a provider left to try.
@@ -291,6 +313,7 @@ async fn ocr_transcribe(app: AppHandle, image_data_url: String) -> Result<Transc
                             latex,
                             provider_label: local_label,
                             fell_back_from: Some(chain[0].0.info().label),
+                            name: None,
                         });
                     }
                 }
@@ -314,10 +337,7 @@ struct Verdict {
 async fn ocr_verify(app: AppHandle, image_data_url: String, latex: String) -> Result<Verdict, String> {
     // Verification needs a reasoning vision LLM — SimpleTex (OCR-only) can't do
     // it, so pick the first non-SimpleTex provider that has a key (active first).
-    let (provider, key) = config::fallback_chain(&app)
-        .into_iter()
-        .find(|(p, _)| *p != provider::Provider::SimpleTex)
-        .ok_or_else(|| "No LLM provider configured for verification (SimpleTex can't verify).".to_string())?;
+    let (provider, key) = reasoning_provider(&app)?;
 
     let raw = ocr::verify(provider, &image_data_url, &latex, &key)
         .await
@@ -347,6 +367,42 @@ fn strip_prefix_note(line: &str) -> String {
     line.split_once(['—', '-', ':'])
         .map(|(_, rest)| rest.trim().to_string())
         .unwrap_or_default()
+}
+
+// The first non-SimpleTex provider with a key (active first). SimpleTex is
+// OCR-only; naming/explaining/verifying need a reasoning vision LLM.
+fn reasoning_provider(app: &AppHandle) -> Result<(provider::Provider, String), String> {
+    config::fallback_chain(app)
+        .into_iter()
+        .find(|(p, _)| *p != provider::Provider::SimpleTex)
+        .ok_or_else(|| "No reasoning LLM provider is configured — add a key in Settings (⌘,).".to_string())
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Explanation {
+    text: String,
+    provider_label: &'static str,
+}
+
+/// Reformulate the statement in plain prose, in the UI language, to explain what
+/// it means. User-triggered (the "plain language" button).
+#[tauri::command]
+async fn ocr_explain(
+    app: AppHandle,
+    image_data_url: String,
+    latex: String,
+    lang: String,
+) -> Result<Explanation, String> {
+    let (provider, key) = reasoning_provider(&app)?;
+    let text = ocr::explain(provider, &image_data_url, &latex, &key, &lang)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(Explanation {
+        text: text.trim().to_string(),
+        provider_label: provider.info().label,
+    })
 }
 
 #[cfg(test)]
@@ -447,7 +503,8 @@ pub fn run() {
             history::set_entry_pinned,
             history::clear_uncurated,
             ocr_transcribe,
-            ocr_verify
+            ocr_verify,
+            ocr_explain
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

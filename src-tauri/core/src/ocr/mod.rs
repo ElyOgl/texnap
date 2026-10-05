@@ -187,22 +187,132 @@ pub async fn verify(
     api_key: &str,
 ) -> Result<String, OcrError> {
     let prompt = verify_prompt(latex);
+    run_prompt(provider, image_data_url, &prompt, api_key, "verify").await
+}
+
+/// Human-readable language name for prompts, from a UI locale code.
+fn language_name(lang: &str) -> &'static str {
+    match lang {
+        "en" => "English",
+        _ => "French",
+    }
+}
+
+/// Appended to the transcription prompt so the model also names the result in
+/// the SAME call (no extra API request). The name is isolated on a final
+/// `@@NAME@@` metadata line so it can be split off without touching the LaTeX.
+fn name_suffix(lang: &str) -> String {
+    format!(
+        "\n\nAFTER the LaTeX, add one final line — and nothing after it — in EXACTLY this format:\n\
+@@NAME@@ <known|suggested> | <name in {lang}>\n\
+Use \"known\" and give the standard, widely-used name in {lang} if this is an established named result (theorem, lemma, proposition, identity, inequality, definition, named formula); otherwise use \"suggested\" and invent a SHORT (2 to 6 words) memorable name in {lang} from the key concepts or what it establishes. \
+This @@NAME@@ line is metadata, NOT part of the LaTeX — never put a name, a title, or any prose anywhere else in the output. If unsure, still give your single best guess on that line."
+    )
+}
+
+fn transcribe_name_prompt(lang: &str) -> String {
+    format!("{PROMPT}{}", name_suffix(language_name(lang)))
+}
+
+/// Split a combined transcription+name response into (latex, optional
+/// (known, name)). Tolerant: no `@@NAME@@` marker ⇒ the whole output is LaTeX.
+fn split_transcription_name(raw: &str) -> (String, Option<(bool, String)>) {
+    match raw.split_once("@@NAME@@") {
+        Some((latex, rest)) => {
+            let latex = latex.trim().to_string();
+            let rest = rest.trim();
+            let (status, name) = rest.lines().next().unwrap_or("").split_once('|').unwrap_or(("", rest));
+            let name = name.trim().trim_matches(['"', '`', '*']).trim().to_string();
+            let known = status.to_ascii_lowercase().contains("known");
+            if name.is_empty() {
+                (latex, None)
+            } else {
+                (latex, Some((known, name)))
+            }
+        }
+        None => (raw.trim().to_string(), None),
+    }
+}
+
+fn explain_prompt(latex: &str, lang: &str) -> String {
+    format!(
+        "Explain, in plain {lang}, the mathematical statement shown in the image (transcribed as LaTeX below) to a student:\n\n{latex}\n\n\
+In 2 to 4 sentences, put into words what it means — the objects and hypotheses involved and what it establishes or proves — and why it matters. \
+Write natural {lang} prose. Do not restate it as a formula and avoid LaTeX (a short inline symbol is acceptable only if unavoidable). No preamble, no headings, no markdown."
+    )
+}
+
+/// Transcribe AND name in a single request: the model returns the LaTeX plus a
+/// trailing `@@NAME@@` metadata line, split apart here. Naming is cloud-only and
+/// costs no extra API call (folded into the transcription). SimpleTex (OCR-only)
+/// transcribes without a name; Local is routed via `transcribe_local`.
+pub async fn transcribe_and_name(
+    provider: Provider,
+    image_data_url: &str,
+    api_key: &str,
+    lang: &str,
+) -> Result<(String, Option<(bool, String)>), OcrError> {
     match provider {
-        Provider::Anthropic => anthropic::call(image_data_url, &prompt, api_key).await,
-        Provider::Gemini => gemini::call(image_data_url, &prompt, api_key).await,
+        Provider::SimpleTex => Ok((simpletex::call(image_data_url, api_key).await?, None)),
+        Provider::Local => Err(OcrError::Local(
+            "local provider must be called via transcribe_local".into(),
+        )),
+        _ => {
+            let prompt = transcribe_name_prompt(lang);
+            let raw = match provider {
+                Provider::Anthropic => anthropic::call(image_data_url, &prompt, api_key).await,
+                Provider::Gemini => gemini::call(image_data_url, &prompt, api_key).await,
+                Provider::OpenRouter => {
+                    openai_compat::call(&openai_compat::OPENROUTER, image_data_url, &prompt, api_key).await
+                }
+                Provider::OpenAi => {
+                    openai_compat::call(&openai_compat::OPENAI, image_data_url, &prompt, api_key).await
+                }
+                _ => unreachable!("SimpleTex/Local handled above"),
+            }?;
+            Ok(split_transcription_name(&raw))
+        }
+    }
+}
+
+/// Reformulate the statement in plain prose, in the UI language, to explain what
+/// it means. Like `verify`, needs a reasoning vision LLM (not SimpleTex/Local).
+pub async fn explain(
+    provider: Provider,
+    image_data_url: &str,
+    latex: &str,
+    api_key: &str,
+    lang: &str,
+) -> Result<String, OcrError> {
+    let prompt = explain_prompt(latex, language_name(lang));
+    run_prompt(provider, image_data_url, &prompt, api_key, "explain").await
+}
+
+/// Dispatch a free-form vision+text prompt to a reasoning provider. Shared by
+/// `verify`/`name`/`explain`; SimpleTex (OCR-only) and Local can't do these.
+async fn run_prompt(
+    provider: Provider,
+    image_data_url: &str,
+    prompt: &str,
+    api_key: &str,
+    task: &str,
+) -> Result<String, OcrError> {
+    match provider {
+        Provider::Anthropic => anthropic::call(image_data_url, prompt, api_key).await,
+        Provider::Gemini => gemini::call(image_data_url, prompt, api_key).await,
         Provider::OpenRouter => {
-            openai_compat::call(&openai_compat::OPENROUTER, image_data_url, &prompt, api_key).await
+            openai_compat::call(&openai_compat::OPENROUTER, image_data_url, prompt, api_key).await
         }
         Provider::OpenAi => {
-            openai_compat::call(&openai_compat::OPENAI, image_data_url, &prompt, api_key).await
+            openai_compat::call(&openai_compat::OPENAI, image_data_url, prompt, api_key).await
         }
         Provider::SimpleTex => Err(OcrError::Api {
             status: 0,
-            message: "SimpleTex is OCR-only and can't verify.".into(),
+            message: format!("SimpleTex is OCR-only and can't {task}."),
         }),
         Provider::Local => Err(OcrError::Api {
             status: 0,
-            message: "The local model can't verify.".into(),
+            message: format!("The local model can't {task} yet."),
         }),
     }
 }
