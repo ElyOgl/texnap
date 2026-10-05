@@ -129,6 +129,8 @@ const LOCAL_MODEL_BASE: &str =
 #[cfg(feature = "local")]
 async fn download_model_file(
     app: &AppHandle,
+    event: &str,
+    url: &str,
     name: &str,
     expected_sha: &str,
     index: usize,
@@ -144,7 +146,7 @@ async fn download_model_file(
         return Ok(()); // already downloaded
     }
     let resp = reqwest::Client::new()
-        .get(format!("{LOCAL_MODEL_BASE}/{name}"))
+        .get(url)
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -163,7 +165,7 @@ async fn download_model_file(
         hasher.update(&chunk);
         received += chunk.len() as u64;
         let _ = app.emit(
-            "local-model-progress",
+            event,
             serde_json::json!({ "file": name, "received": received, "total": total, "index": index, "count": count }),
         );
     }
@@ -186,7 +188,8 @@ async fn download_local_model(app: AppHandle) -> Result<(), String> {
         let dir = local_model_dir(&app)?;
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         for (i, (name, sha)) in LOCAL_MODEL_FILES.iter().enumerate() {
-            download_model_file(&app, name, sha, i, LOCAL_MODEL_FILES.len(), &dir).await?;
+            let url = format!("{LOCAL_MODEL_BASE}/{name}");
+            download_model_file(&app, "local-model-progress", &url, name, sha, i, LOCAL_MODEL_FILES.len(), &dir).await?;
         }
         Ok(())
     }
@@ -202,6 +205,65 @@ async fn download_local_model(app: AppHandle) -> Result<(), String> {
 fn local_model_status(app: AppHandle) -> Result<String, String> {
     let dir = local_model_dir(&app)?;
     Ok(if ocr::local_model_downloaded(&dir) {
+        "ready".into()
+    } else {
+        "not-downloaded".into()
+    })
+}
+
+// ---- F6b: on-device explanation LLM (separate, optional download) ----
+
+/// Where the explanation LLM lives: app_data_dir/models/qwen2.5-1.5b.
+fn local_llm_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Couldn't resolve the app data directory: {e}"))?
+        .join("models")
+        .join("qwen2.5-1.5b"))
+}
+
+/// The Qwen2.5-1.5B-Instruct GGUF + tokenizer, each (name, url, sha256), pinned
+/// to immutable HF commits. Separate repos, so each carries its full URL.
+#[cfg(feature = "local")]
+const LOCAL_LLM_FILES: [(&str, &str, &str); 2] = [
+    (
+        "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+    ),
+    (
+        "tokenizer.json",
+        "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct/resolve/989aa7980e4cf806f80c7fef2b1adb7bc71aa306/tokenizer.json",
+        "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+    ),
+];
+
+/// Download the explanation LLM (~1.1 GB) into the app data dir, emitting
+/// `local-llm-progress` events. Idempotent: skips files already present.
+#[tauri::command]
+async fn download_local_llm(app: AppHandle) -> Result<(), String> {
+    #[cfg(feature = "local")]
+    {
+        let dir = local_llm_dir(&app)?;
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        for (i, (name, url, sha)) in LOCAL_LLM_FILES.iter().enumerate() {
+            download_model_file(&app, "local-llm-progress", url, name, sha, i, LOCAL_LLM_FILES.len(), &dir).await?;
+        }
+        Ok(())
+    }
+    #[cfg(not(feature = "local"))]
+    {
+        let _ = app;
+        Err("Offline explanation isn't included in this build.".into())
+    }
+}
+
+/// "ready" | "not-downloaded" for the explanation LLM.
+#[tauri::command]
+fn local_llm_status(app: AppHandle) -> Result<String, String> {
+    let dir = local_llm_dir(&app)?;
+    Ok(if ocr::local_llm_downloaded(&dir) {
         "ready".into()
     } else {
         "not-downloaded".into()
@@ -385,8 +447,23 @@ struct Explanation {
     provider_label: &'static str,
 }
 
+// F6b: run the on-device explanation LLM off the async runtime (CPU/Metal heavy).
+async fn explain_local_in_app(app: &AppHandle, latex: &str, lang: &str) -> Result<String, String> {
+    let dir = local_llm_dir(app)?;
+    if !ocr::local_llm_downloaded(&dir) {
+        return Err("The offline explanation model isn't downloaded yet — get it in Settings (⌘,).".into());
+    }
+    let latex = latex.to_string();
+    let lang = lang.to_string();
+    tauri::async_runtime::spawn_blocking(move || ocr::explain_local(&latex, &lang, &dir))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
 /// Reformulate the statement in plain prose, in the UI language, to explain what
-/// it means. User-triggered (the "plain language" button).
+/// it means. User-triggered (the "plain language" button). Uses the on-device
+/// LLM when the local provider is active, otherwise the active cloud provider.
 #[tauri::command]
 async fn ocr_explain(
     app: AppHandle,
@@ -394,6 +471,14 @@ async fn ocr_explain(
     latex: String,
     lang: String,
 ) -> Result<Explanation, String> {
+    if config::active_provider(&app) == provider::Provider::Local {
+        let text = explain_local_in_app(&app, &latex, &lang).await?;
+        return Ok(Explanation {
+            text,
+            provider_label: provider::Provider::Local.info().label,
+        });
+    }
+
     let (provider, key) = reasoning_provider(&app)?;
     let text = ocr::explain(provider, &image_data_url, &latex, &key, &lang)
         .await
@@ -488,6 +573,8 @@ pub fn run() {
             write_temp_html,
             download_local_model,
             local_model_status,
+            download_local_llm,
+            local_llm_status,
             config::get_config_status,
             config::list_providers,
             config::save_provider_key,

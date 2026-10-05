@@ -70,6 +70,10 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   const [localStatus, setLocalStatus] = useState<"unknown" | "not-downloaded" | "downloading" | "ready">("unknown");
   const [dlFiles, setDlFiles] = useState<{ name: string; received: number; total: number }[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
+  // F6b: optional on-device explanation LLM (separate download).
+  const [llmStatus, setLlmStatus] = useState<"unknown" | "not-downloaded" | "downloading" | "ready">("unknown");
+  const [llmDlFiles, setLlmDlFiles] = useState<{ name: string; received: number; total: number }[]>([]);
+  const [llmError, setLlmError] = useState<string | null>(null);
 
   const isLocal = selected === "local";
 
@@ -160,6 +164,44 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
       onDone();
     } catch (err) {
       setLocalError(String(err));
+    }
+  };
+
+  // Explanation LLM: status when Local is selected, download progress, download.
+  useEffect(() => {
+    if (!isLocal) return;
+    void invoke<string>("local_llm_status")
+      .then((s) => setLlmStatus(s === "ready" ? "ready" : "not-downloaded"))
+      .catch(() => setLlmStatus("not-downloaded"));
+  }, [isLocal]);
+
+  useEffect(() => {
+    if (llmStatus !== "downloading") return;
+    const un = listen<{ received: number; total: number; index: number; count: number }>(
+      "local-llm-progress",
+      (e) =>
+        setLlmDlFiles((prev) =>
+          prev.map((f, i) =>
+            i === e.payload.index ? { ...f, received: e.payload.received, total: e.payload.total } : f,
+          ),
+        ),
+    );
+    return () => {
+      void un.then((f) => f());
+    };
+  }, [llmStatus]);
+
+  const LLM_DL_LABELS = [t("apiKey.llm.fileModel"), t("apiKey.llm.fileVocab")];
+  const downloadLlm = async () => {
+    setLlmError(null);
+    setLlmDlFiles(LLM_DL_LABELS.map((name) => ({ name, received: 0, total: 0 })));
+    setLlmStatus("downloading");
+    try {
+      await invoke("download_local_llm");
+      setLlmStatus("ready");
+    } catch (err) {
+      setLlmError(String(err));
+      setLlmStatus("not-downloaded");
     }
   };
 
@@ -311,6 +353,51 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             )}
             {localError && <p className="mt-1.5 text-[11px] text-red-400">{localError}</p>}
             <p className="mt-1.5 text-[11px] text-ink-3">{t("apiKey.local.autoHint")}</p>
+
+            {/* F6b: optional on-device explanation model (explanation-only). */}
+            <div className="mt-3 border-t border-line pt-3">
+              <div className="mb-1.5 text-[11px] text-ink-3">{t("apiKey.llm.title")}</div>
+              {llmStatus === "ready" ? (
+                <div className="flex items-center gap-2.5 rounded-lg border border-ok/40 bg-surface-2 p-3">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ok">
+                    <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" />
+                  </svg>
+                  <span className="text-[12px] text-ink">{t("apiKey.llm.ready")}</span>
+                </div>
+              ) : llmStatus === "downloading" ? (
+                <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 p-3">
+                  <span className="text-[12px] text-ink-2">{t("apiKey.llm.downloading")}</span>
+                  {llmDlFiles.map((f) => (
+                    <div key={f.name} className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-[10.5px] text-ink-3">
+                        <span>{f.name}</span>
+                        <span className="font-mono">
+                          {f.total ? t("apiKey.mbProgress", { received: mb(f.received), total: mb(f.total) }) : "…"}
+                        </span>
+                      </div>
+                      <div className="h-1 overflow-hidden rounded bg-surface-3">
+                        <div
+                          className="h-full bg-accent transition-[width] duration-150"
+                          style={{ width: f.total ? `${Math.round((f.received / f.total) * 100)}%` : "0%" }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface-2 p-3">
+                  <span className="text-[12px] leading-relaxed text-ink-2">{t("apiKey.llm.intro")}</span>
+                  <button
+                    type="button"
+                    onClick={() => void downloadLlm()}
+                    className="self-start rounded-md border border-line-2 px-3.5 py-2 text-[12px] font-medium text-ink-2 hover:text-ink"
+                  >
+                    {t("apiKey.llm.download")}
+                  </button>
+                </div>
+              )}
+              {llmError && <p className="mt-1.5 text-[11px] text-red-400">{llmError}</p>}
+            </div>
           </div>
         ) : (
         <div>

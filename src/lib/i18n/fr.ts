@@ -100,6 +100,15 @@ export const fr: Record<TKey, Entry> = {
   "explain.button": "Langage courant",
   "explain.loading": "Explication…",
   "explain.title": "Reformuler cet énoncé en langage courant",
+  "explain.unavailable": "Indisponible — à configurer dans les Réglages",
+  // Offline explanation model (local provider, Settings)
+  "apiKey.llm.title": "Explications hors-ligne (optionnel)",
+  "apiKey.llm.intro": "Explique les énoncés en langage courant, hors-ligne. Télécharge un modèle (~1,1 Go) une seule fois.",
+  "apiKey.llm.download": "Télécharger le modèle d'explication (~1,1 Go)",
+  "apiKey.llm.downloading": "Téléchargement du modèle d'explication…",
+  "apiKey.llm.ready": "Modèle d'explication prêt — fonctionne hors-ligne",
+  "apiKey.llm.fileModel": "Modèle",
+  "apiKey.llm.fileVocab": "Vocabulaire",
 
   // Tags
   "tags.remove": "Retirer le tag {tag}",

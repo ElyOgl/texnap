@@ -101,6 +101,15 @@ export const en = {
   "explain.button": "Plain language",
   "explain.loading": "Explaining…",
   "explain.title": "Reformulate this statement in plain words",
+  "explain.unavailable": "Unavailable — set it up in Settings",
+  // Offline explanation model (local provider, Settings)
+  "apiKey.llm.title": "Offline explanations (optional)",
+  "apiKey.llm.intro": "Explain statements in plain words, offline. Download a model (~1.1 GB) once.",
+  "apiKey.llm.download": "Download the explanation model (~1.1 GB)",
+  "apiKey.llm.downloading": "Downloading the explanation model…",
+  "apiKey.llm.ready": "Explanation model ready — works offline",
+  "apiKey.llm.fileModel": "Model",
+  "apiKey.llm.fileVocab": "Vocabulary",
 
   // Tags
   "tags.remove": "Remove tag {tag}",

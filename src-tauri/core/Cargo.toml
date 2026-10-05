@@ -22,5 +22,23 @@ tokenizers = { version = "0.20", default-features = false, features = ["onig"], 
 image = { version = "0.25", optional = true }
 half = { version = "2", optional = true }
 
+# F6b: on-device LLM for offline plain-language explanation (Qwen2.5-1.5B GGUF
+# via candle). Explanation-only on the local provider; naming stays cloud-only.
+# Metal acceleration is enabled by the app through the `metal` feature below.
+candle-core = { version = "0.9", optional = true }
+candle-nn = { version = "0.9", optional = true }
+candle-transformers = { version = "0.9", optional = true }
+
 [features]
-local = ["dep:ort", "dep:tokenizers", "dep:image", "dep:half"]
+local = [
+    "dep:ort",
+    "dep:tokenizers",
+    "dep:image",
+    "dep:half",
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:candle-transformers",
+]
+# Opt-in Metal/Accelerate for the on-device LLM (the app turns this on; the CLI
+# never does). candle links the system Metal/Accelerate frameworks — no dylib.
+metal = ["candle-core?/metal", "candle-nn?/metal", "candle-transformers?/metal", "candle-core?/accelerate", "candle-nn?/accelerate"]

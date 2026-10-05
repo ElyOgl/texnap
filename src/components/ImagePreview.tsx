@@ -8,6 +8,7 @@ import { TagEditor } from "./Tags";
 import { HintBar } from "./ui";
 import { WanderingEyes } from "./WanderingEyes";
 import { useI18n, type TKey } from "../lib/i18n";
+import type { ConfigStatus } from "../lib/providers";
 import "katex/dist/katex.min.css";
 
 type Props = {
@@ -73,6 +74,9 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
+  // Whether "plain language" can run: a cloud LLM key, or (on the local
+  // provider) the on-device explanation model is downloaded.
+  const [explainReady, setExplainReady] = useState(false);
   // Guards async name/explain results against a newer capture arriving meanwhile.
   const imageIdRef = useRef(image.id);
 
@@ -96,6 +100,29 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
   useEffect(() => {
     setVerdict(null);
   }, [latex]);
+
+  // Is "plain language" available? Cloud: any non-SimpleTex key. Local: the
+  // on-device explanation model must be downloaded.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await invoke<ConfigStatus>("get_config_status");
+        let ready: boolean;
+        if (status.activeProvider === "local") {
+          ready = (await invoke<string>("local_llm_status")) === "ready";
+        } else {
+          ready = status.savedProviders.some((p) => p !== "simpletex" && p !== "local");
+        }
+        if (!cancelled) setExplainReady(ready);
+      } catch {
+        if (!cancelled) setExplainReady(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [image.id]);
 
   const rendered = useMemo(() => (latex ? renderLatex(latex) : null), [latex]);
 
@@ -369,8 +396,8 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
               <button
                 type="button"
                 onClick={() => void explain()}
-                disabled={explaining}
-                title={t("explain.title")}
+                disabled={explaining || !explainReady}
+                title={explainReady ? t("explain.title") : t("explain.unavailable")}
                 className="ml-auto flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

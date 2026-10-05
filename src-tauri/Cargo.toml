@@ -54,7 +54,7 @@ futures-util = { version = "0.3", optional = true }
 # variant with `--no-default-features` if ever needed.
 [features]
 default = ["local"]
-local = ["texnap-core/local", "dep:reqwest", "dep:sha2", "dep:futures-util"]
+local = ["texnap-core/local", "texnap-core/metal", "dep:reqwest", "dep:sha2", "dep:futures-util"]
 
 
 # Only the eval runner (examples/eval.rs) needs its own async runtime — the
