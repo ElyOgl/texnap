@@ -54,7 +54,10 @@ futures-util = { version = "0.3", optional = true }
 # variant with `--no-default-features` if ever needed.
 [features]
 default = ["local"]
-local = ["texnap-core/local", "texnap-core/metal", "dep:reqwest", "dep:sha2", "dep:futures-util"]
+local = ["texnap-core/local", "dep:reqwest", "dep:sha2", "dep:futures-util"]
+# Opt-in offline explanation LLM (candle + Metal). Off by default so releases
+# stay lean; enable to build the on-device explanation (deferred — weak at 1.5B).
+local_llm = ["local", "texnap-core/local_llm", "texnap-core/metal"]
 
 
 # Only the eval runner (examples/eval.rs) needs its own async runtime — the

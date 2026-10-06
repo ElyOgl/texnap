@@ -30,15 +30,11 @@ candle-nn = { version = "0.9", optional = true }
 candle-transformers = { version = "0.9", optional = true }
 
 [features]
-local = [
-    "dep:ort",
-    "dep:tokenizers",
-    "dep:image",
-    "dep:half",
-    "dep:candle-core",
-    "dep:candle-nn",
-    "dep:candle-transformers",
-]
-# Opt-in Metal/Accelerate for the on-device LLM (the app turns this on; the CLI
-# never does). candle links the system Metal/Accelerate frameworks — no dylib.
+local = ["dep:ort", "dep:tokenizers", "dep:image", "dep:half"]
+# Opt-in on-device explanation LLM (candle). Deliberately NOT part of `local`,
+# so the default/release build stays lean (no candle). Quality at 1.5B is weak
+# for now — kept behind this flag to finish later. Needs `metal` for speed.
+local_llm = ["local", "dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
+# Metal/Accelerate for the on-device LLM. candle links the system frameworks —
+# no dylib. Enabled by the app alongside local_llm.
 metal = ["candle-core?/metal", "candle-nn?/metal", "candle-transformers?/metal", "candle-core?/accelerate", "candle-nn?/accelerate"]

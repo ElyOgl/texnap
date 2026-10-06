@@ -74,8 +74,10 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
-  // Whether "plain language" can run: a cloud LLM key, or (on the local
-  // provider) the on-device explanation model is downloaded.
+  // Whether "plain language" is offered at all for the active provider
+  // (cloud always; local only if this build ships the on-device LLM) and,
+  // if so, whether it can run now (a key, or the local model downloaded).
+  const [explainSupported, setExplainSupported] = useState(true);
   const [explainReady, setExplainReady] = useState(false);
   // Guards async name/explain results against a newer capture arriving meanwhile.
   const imageIdRef = useRef(image.id);
@@ -108,15 +110,23 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
     void (async () => {
       try {
         const status = await invoke<ConfigStatus>("get_config_status");
-        let ready: boolean;
+        let supported = true;
+        let ready = false;
         if (status.activeProvider === "local") {
-          ready = (await invoke<string>("local_llm_status")) === "ready";
+          supported = await invoke<boolean>("local_llm_available");
+          ready = supported && (await invoke<string>("local_llm_status")) === "ready";
         } else {
           ready = status.savedProviders.some((p) => p !== "simpletex" && p !== "local");
         }
-        if (!cancelled) setExplainReady(ready);
+        if (!cancelled) {
+          setExplainSupported(supported);
+          setExplainReady(ready);
+        }
       } catch {
-        if (!cancelled) setExplainReady(false);
+        if (!cancelled) {
+          setExplainSupported(false);
+          setExplainReady(false);
+        }
       }
     })();
     return () => {
@@ -392,19 +402,22 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                         : verdict.note}
                 </span>
               )}
-              {/* Plain-language reformulation — bottom-right. */}
-              <button
-                type="button"
-                onClick={() => void explain()}
-                disabled={explaining || !explainReady}
-                title={explainReady ? t("explain.title") : t("explain.unavailable")}
-                className="ml-auto flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                {explaining ? t("explain.loading") : t("explain.button")}
-              </button>
+              {/* Plain-language reformulation — bottom-right. Hidden when the
+                  active provider can't offer it (e.g. local in the lean build). */}
+              {explainSupported && (
+                <button
+                  type="button"
+                  onClick={() => void explain()}
+                  disabled={explaining || !explainReady}
+                  title={explainReady ? t("explain.title") : t("explain.unavailable")}
+                  className="ml-auto flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {explaining ? t("explain.loading") : t("explain.button")}
+                </button>
+              )}
             </div>
 
             {(explanation || explainError) && (

@@ -225,7 +225,7 @@ fn local_llm_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 
 /// The Qwen2.5-1.5B-Instruct GGUF + tokenizer, each (name, url, sha256), pinned
 /// to immutable HF commits. Separate repos, so each carries its full URL.
-#[cfg(feature = "local")]
+#[cfg(feature = "local_llm")]
 const LOCAL_LLM_FILES: [(&str, &str, &str); 2] = [
     (
         "qwen2.5-1.5b-instruct-q4_k_m.gguf",
@@ -243,7 +243,7 @@ const LOCAL_LLM_FILES: [(&str, &str, &str); 2] = [
 /// `local-llm-progress` events. Idempotent: skips files already present.
 #[tauri::command]
 async fn download_local_llm(app: AppHandle) -> Result<(), String> {
-    #[cfg(feature = "local")]
+    #[cfg(feature = "local_llm")]
     {
         let dir = local_llm_dir(&app)?;
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -252,7 +252,7 @@ async fn download_local_llm(app: AppHandle) -> Result<(), String> {
         }
         Ok(())
     }
-    #[cfg(not(feature = "local"))]
+    #[cfg(not(feature = "local_llm"))]
     {
         let _ = app;
         Err("Offline explanation isn't included in this build.".into())
@@ -268,6 +268,13 @@ fn local_llm_status(app: AppHandle) -> Result<String, String> {
     } else {
         "not-downloaded".into()
     })
+}
+
+/// Whether this build includes the on-device explanation LLM (candle). The UI
+/// hides the offline-explanation surface when it doesn't (the lean release).
+#[tauri::command]
+fn local_llm_available() -> bool {
+    cfg!(feature = "local_llm")
 }
 
 #[tauri::command]
@@ -471,7 +478,7 @@ async fn ocr_explain(
     latex: String,
     lang: String,
 ) -> Result<Explanation, String> {
-    if config::active_provider(&app) == provider::Provider::Local {
+    if cfg!(feature = "local_llm") && config::active_provider(&app) == provider::Provider::Local {
         let text = explain_local_in_app(&app, &latex, &lang).await?;
         return Ok(Explanation {
             text,
@@ -575,6 +582,7 @@ pub fn run() {
             local_model_status,
             download_local_llm,
             local_llm_status,
+            local_llm_available,
             config::get_config_status,
             config::list_providers,
             config::save_provider_key,

@@ -7,7 +7,7 @@
 //!   "$HOME/Library/Application Support/fr.elyo.texnap/models/qwen2.5-1.5b" fr
 //! ```
 
-#[cfg(feature = "local")]
+#[cfg(feature = "local_llm")]
 fn main() {
     use std::path::PathBuf;
     let mut args = std::env::args().skip(1);
@@ -29,8 +29,8 @@ fn main() {
     }
 }
 
-#[cfg(not(feature = "local"))]
+#[cfg(not(feature = "local_llm"))]
 fn main() {
-    eprintln!("local_explain_smoke requires `--features local`");
+    eprintln!("local_explain_smoke requires `--features local_llm`");
     std::process::exit(2);
 }

@@ -7,7 +7,7 @@ mod anthropic;
 mod gemini;
 #[cfg(feature = "local")]
 pub mod local;
-#[cfg(feature = "local")]
+#[cfg(feature = "local_llm")]
 pub mod local_llm;
 mod openai_compat;
 mod simpletex;
@@ -158,7 +158,7 @@ pub fn local_model_downloaded(model_dir: &std::path::Path) -> bool {
 }
 
 /// F6b: plain-language explanation with the on-device LLM in `model_dir`.
-#[cfg(feature = "local")]
+#[cfg(feature = "local_llm")]
 pub fn explain_local(
     latex: &str,
     lang: &str,
@@ -168,7 +168,7 @@ pub fn explain_local(
 }
 
 /// F6b: whether the on-device explanation LLM is present in `model_dir`.
-#[cfg(feature = "local")]
+#[cfg(feature = "local_llm")]
 pub fn local_llm_downloaded(model_dir: &std::path::Path) -> bool {
     local_llm::is_downloaded(model_dir)
 }
@@ -182,11 +182,11 @@ pub fn transcribe_local(_: &str, _: &std::path::Path) -> Result<String, OcrError
 pub fn local_model_downloaded(_: &std::path::Path) -> bool {
     false
 }
-#[cfg(not(feature = "local"))]
+#[cfg(not(feature = "local_llm"))]
 pub fn explain_local(_: &str, _: &str, _: &std::path::Path) -> Result<String, OcrError> {
     Err(OcrError::Local("local explanation isn't included in this build".into()))
 }
-#[cfg(not(feature = "local"))]
+#[cfg(not(feature = "local_llm"))]
 pub fn local_llm_downloaded(_: &std::path::Path) -> bool {
     false
 }

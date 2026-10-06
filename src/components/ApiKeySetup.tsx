@@ -70,7 +70,9 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   const [localStatus, setLocalStatus] = useState<"unknown" | "not-downloaded" | "downloading" | "ready">("unknown");
   const [dlFiles, setDlFiles] = useState<{ name: string; received: number; total: number }[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
-  // F6b: optional on-device explanation LLM (separate download).
+  // F6b: optional on-device explanation LLM (separate download). Only shown when
+  // this build ships it (the lean release hides it).
+  const [llmAvailable, setLlmAvailable] = useState(false);
   const [llmStatus, setLlmStatus] = useState<"unknown" | "not-downloaded" | "downloading" | "ready">("unknown");
   const [llmDlFiles, setLlmDlFiles] = useState<{ name: string; received: number; total: number }[]>([]);
   const [llmError, setLlmError] = useState<string | null>(null);
@@ -167,9 +169,10 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
     }
   };
 
-  // Explanation LLM: status when Local is selected, download progress, download.
+  // Explanation LLM: availability + status when Local is selected.
   useEffect(() => {
     if (!isLocal) return;
+    void invoke<boolean>("local_llm_available").then(setLlmAvailable).catch(() => setLlmAvailable(false));
     void invoke<string>("local_llm_status")
       .then((s) => setLlmStatus(s === "ready" ? "ready" : "not-downloaded"))
       .catch(() => setLlmStatus("not-downloaded"));
@@ -354,7 +357,9 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             {localError && <p className="mt-1.5 text-[11px] text-red-400">{localError}</p>}
             <p className="mt-1.5 text-[11px] text-ink-3">{t("apiKey.local.autoHint")}</p>
 
-            {/* F6b: optional on-device explanation model (explanation-only). */}
+            {/* F6b: optional on-device explanation model (explanation-only).
+                Hidden in the lean release (local explanation deferred). */}
+            {llmAvailable && (
             <div className="mt-3 border-t border-line pt-3">
               <div className="mb-1.5 text-[11px] text-ink-3">{t("apiKey.llm.title")}</div>
               {llmStatus === "ready" ? (
@@ -398,6 +403,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               )}
               {llmError && <p className="mt-1.5 text-[11px] text-red-400">{llmError}</p>}
             </div>
+            )}
           </div>
         ) : (
         <div>

@@ -277,7 +277,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
                   {t("library.pinned")}
                 </div>
                 {pinned.map(row)}
-                {rest.length > 0 && <div className="h-px bg-line" />}
+                {rest.length > 0 && <div className="my-3 h-0.5 rounded-full bg-line-2" />}
               </>
             )}
             {rest.map(row)}
