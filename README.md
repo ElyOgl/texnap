@@ -2,8 +2,6 @@
 
 <div align="center">
 
-[![Watch the texnap demo](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo-poster.png)](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo.mp4)
-
 ▶️ **[Watch the ~80-second demo](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo.mp4)** — a quick tour of capturing math and getting LaTeX back.
 
 </div>
@@ -176,7 +174,8 @@ configured provider if one hits its quota.
 
 | Key | Action |
 | --- | --- |
-| ⌃⌘M | Capture a screen region (customizable in Settings) |
+| ⌃⌘, | (AZERTY) Capture a screen region (customizable in Settings) |
+| ⌃⌘M | (QWERTY) Capture a screen region (customizable in Settings) |
 | ⌘V | Paste / new capture |
 | ⏎ | Transcribe |
 | ⌘C | Copy the LaTeX |
@@ -206,3 +205,10 @@ shared by the desktop app (`src-tauri/`) and the CLI (`cli/`). `cargo test
 --workspace` runs everything.
 
 Built with Tauri 2 (Rust) + React + Vite + KaTeX.
+
+
+<div align = "center">
+
+[![Watch the texnap demo](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo-poster.png)](https://raw.githubusercontent.com/ElyOgl/texnap/main/assets/demo.mp4)
+
+</div>
