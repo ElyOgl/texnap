@@ -260,11 +260,20 @@ fn split_transcription_name(raw: &str) -> (String, Option<(bool, String)>) {
     }
 }
 
-fn explain_prompt(latex: &str, lang: &str) -> String {
+fn explain_prompt(latex: &str, name: Option<&str>, lang: &str) -> String {
+    let name_line = match name {
+        Some(n) if !n.trim().is_empty() => {
+            format!("This statement is known as «{}» — use that framing if it helps.\n\n", n.trim())
+        }
+        _ => String::new(),
+    };
     format!(
-        "Explain, in plain {lang}, the mathematical statement shown in the image (transcribed as LaTeX below) to a student:\n\n{latex}\n\n\
-In 2 to 4 sentences, put into words what it means — the objects and hypotheses involved and what it establishes or proves — and why it matters. \
-Write natural {lang} prose. Do not restate it as a formula and avoid LaTeX (a short inline symbol is acceptable only if unavoidable). No preamble, no headings, no markdown."
+        "You are explaining, in plain {lang}, the mathematical statement shown in the image (transcribed as LaTeX below) to a student who wants to truly understand it — not just read it back.\n\n\
+{name_line}{latex}\n\n\
+Write one flowing paragraph of about 5 to 7 sentences of natural {lang} prose that actually explains it, weaving together: what the objects and hypotheses are and the role each hypothesis plays; what the statement establishes or guarantees; the intuition or mechanism behind why it holds (or what it buys you); a concrete special case or simple example when it makes things clearer; and why it matters or where it is used. \
+Go beyond naming the symbols — give understanding. \
+You may use inline math symbols written between single dollar signs (e.g. $f$, $\\varepsilon$, $\\lim_{{n\\to\\infty}} u_n$) and bold a key term with \\textbf{{...}} when it genuinely helps readability. \
+Do not restate the whole thing as a formula, do not use display math, headings, bullet points, markdown fences, or any preamble like « This statement means ». Just the explanatory paragraph."
     )
 }
 
@@ -302,16 +311,36 @@ pub async fn transcribe_and_name(
 }
 
 /// Reformulate the statement in plain prose, in the UI language, to explain what
-/// it means. Like `verify`, needs a reasoning vision LLM (not SimpleTex/Local).
+/// it means. Needs a reasoning vision LLM (not SimpleTex/Local). Gemini uses its
+/// stronger reasoning model (with fallback); the other cloud providers already
+/// run a capable model, so they go through their normal `call`.
 pub async fn explain(
     provider: Provider,
     image_data_url: &str,
     latex: &str,
+    name: Option<&str>,
     api_key: &str,
     lang: &str,
 ) -> Result<String, OcrError> {
-    let prompt = explain_prompt(latex, language_name(lang));
-    run_prompt(provider, image_data_url, &prompt, api_key, "explain").await
+    let prompt = explain_prompt(latex, name, language_name(lang));
+    match provider {
+        Provider::Gemini => gemini::call_reasoning(image_data_url, &prompt, api_key).await,
+        Provider::Anthropic => anthropic::call(image_data_url, &prompt, api_key).await,
+        Provider::OpenRouter => {
+            openai_compat::call(&openai_compat::OPENROUTER, image_data_url, &prompt, api_key).await
+        }
+        Provider::OpenAi => {
+            openai_compat::call(&openai_compat::OPENAI, image_data_url, &prompt, api_key).await
+        }
+        Provider::SimpleTex => Err(OcrError::Api {
+            status: 0,
+            message: "SimpleTex is OCR-only and can't explain.".into(),
+        }),
+        Provider::Local => Err(OcrError::Api {
+            status: 0,
+            message: "The local model can't explain yet.".into(),
+        }),
+    }
 }
 
 /// Dispatch a free-form vision+text prompt to a reasoning provider. Shared by

@@ -42,9 +42,17 @@ import type { Lang } from "./i18n/types";
 // Locale-aware relative time. Uses the platform Intl.RelativeTimeFormat for
 // minutes/hours/days (correct for any language); the sub-minute case has its own
 // short phrase per language.
+const JUST_NOW: Record<Lang, string> = {
+  fr: "à l'instant",
+  en: "just now",
+  it: "proprio ora",
+  de: "gerade eben",
+  es: "ahora mismo",
+};
+
 export function relativeTime(ms: number, lang: Lang = "fr"): string {
   const s = Math.round((Date.now() - ms) / 1000);
-  if (s < 60) return lang === "en" ? "just now" : "à l'instant";
+  if (s < 60) return JUST_NOW[lang];
   const rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto" });
   const m = Math.round(s / 60);
   if (m < 60) return rtf.format(-m, "minute");

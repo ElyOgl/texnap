@@ -14,7 +14,22 @@ type Props = {
   onClose: () => void;
 };
 
-const localeOf = (lang: Lang) => (lang === "en" ? "en-US" : "fr-FR");
+const LOCALES: Record<Lang, string> = {
+  fr: "fr-FR",
+  en: "en-US",
+  it: "it-IT",
+  de: "de-DE",
+  es: "es-ES",
+};
+const localeOf = (lang: Lang) => LOCALES[lang];
+// babel package option per UI language (ngerman = modern German orthography).
+const BABEL: Record<Lang, string> = {
+  fr: "french",
+  en: "english",
+  it: "italian",
+  de: "ngerman",
+  es: "spanish",
+};
 const today = (lang: Lang) =>
   new Date().toLocaleDateString(localeOf(lang), { day: "numeric", month: "long", year: "numeric" });
 
@@ -102,8 +117,7 @@ export function FichePanel({ entries, onClose }: Props) {
       filters: [{ name: "LaTeX", extensions: ["tex"] }],
     });
     if (!path) return;
-    const babelLang = lang === "en" ? "english" : "french";
-    await invoke("save_text_file", { path, contents: buildTex(title, groups, babelLang) });
+    await invoke("save_text_file", { path, contents: buildTex(title, groups, BABEL[lang]) });
     setSavedTex(true);
     window.setTimeout(() => setSavedTex(false), 2000);
   };

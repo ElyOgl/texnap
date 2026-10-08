@@ -15,8 +15,16 @@ use serde::{Deserialize, Serialize};
 // rather than assuming the endpoint shape changed.
 const MODEL: &str = "gemini-3.5-flash-lite";
 
-fn api_url() -> String {
-    format!("https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent")
+// A stronger, thinking-capable model used ONLY for the on-demand plain-language
+// explanation (low volume, user-triggered), where Flash-Lite's reasoning is too
+// shallow. Everything else (OCR, verify) stays on MODEL for the much larger
+// free RPD. Same churn caveat as MODEL: if this 404s, check
+// https://ai.google.dev/gemini-api/docs/models — `call_reasoning` falls back to
+// MODEL on 404/quota so a bad id degrades instead of breaking explanation.
+const REASONING_MODEL: &str = "gemini-3.5-flash";
+
+fn api_url(model: &str) -> String {
+    format!("https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent")
 }
 
 #[derive(Serialize)]
@@ -98,6 +106,35 @@ struct ApiErrorDetail {
 }
 
 pub async fn call(image_data_url: &str, prompt: &str, api_key: &str) -> Result<String, OcrError> {
+    call_with_model(image_data_url, prompt, api_key, MODEL, 4096).await
+}
+
+/// Explanation path: try the stronger reasoning model, falling back to the
+/// default Flash-Lite on quota (429), model-not-found (404), or invalid-argument
+/// (400) — so a tightened free quota or a churned model id degrades gracefully
+/// instead of erroring the "plain language" button. Other errors propagate.
+pub async fn call_reasoning(
+    image_data_url: &str,
+    prompt: &str,
+    api_key: &str,
+) -> Result<String, OcrError> {
+    // Full Flash thinks by default and the answer is longer, so give it a
+    // roomier output budget than OCR before the MAX_TOKENS guard trips.
+    match call_with_model(image_data_url, prompt, api_key, REASONING_MODEL, 8192).await {
+        Err(OcrError::Api { status: 429 | 404 | 400, .. }) => {
+            call_with_model(image_data_url, prompt, api_key, MODEL, 4096).await
+        }
+        other => other,
+    }
+}
+
+async fn call_with_model(
+    image_data_url: &str,
+    prompt: &str,
+    api_key: &str,
+    model: &str,
+    max_output_tokens: u32,
+) -> Result<String, OcrError> {
     let (mime_type, data) = parse_data_url(image_data_url)?;
 
     let body = GenerateContentRequest {
@@ -111,14 +148,12 @@ pub async fn call(image_data_url: &str, prompt: &str, api_key: &str) -> Result<S
                 },
             ],
         }],
-        generation_config: GenerationConfig {
-            max_output_tokens: 4096,
-        },
+        generation_config: GenerationConfig { max_output_tokens },
     };
 
     let client = reqwest::Client::new();
     let response = client
-        .post(api_url())
+        .post(api_url(model))
         .header("x-goog-api-key", api_key)
         .header("content-type", "application/json")
         .json(&body)

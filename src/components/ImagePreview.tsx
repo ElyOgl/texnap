@@ -103,20 +103,27 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
     setVerdict(null);
   }, [latex]);
 
-  // Is "plain language" available? Cloud: any non-SimpleTex key. Local: the
-  // on-device explanation model must be downloaded.
+  // Is "plain language" available? Explanation is a *cloud reasoning* feature:
+  // it ships whenever any cloud key (non-SimpleTex, non-local) is configured —
+  // independent of which engine does the OCR, so it still works while Local is
+  // the active OCR provider. Only when no cloud key exists does it fall to the
+  // on-device model, which is deferred (local_llm off) and so stays hidden.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const status = await invoke<ConfigStatus>("get_config_status");
+        const hasCloudReasoning = status.savedProviders.some(
+          (p) => p !== "simpletex" && p !== "local",
+        );
         let supported = true;
         let ready = false;
-        if (status.activeProvider === "local") {
+        if (hasCloudReasoning) {
+          ready = true;
+        } else if (status.activeProvider === "local") {
+          // No cloud key: only the (deferred) on-device model could explain.
           supported = await invoke<boolean>("local_llm_available");
           ready = supported && (await invoke<string>("local_llm_status")) === "ready";
-        } else {
-          ready = status.savedProviders.some((p) => p !== "simpletex" && p !== "local");
         }
         if (!cancelled) {
           setExplainSupported(supported);
@@ -174,6 +181,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
       const r = await invoke<Explanation>("ocr_explain", {
         imageDataUrl: image.dataUrl,
         latex,
+        name: name?.name ?? null,
         lang,
       });
       setExplanation(r.text);
@@ -425,7 +433,12 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 {explainError ? (
                   <span className="text-red-400">{explainError}</span>
                 ) : (
-                  <span className="text-ink-2">{explanation}</span>
+                  // Render through the same text-mode LaTeX→HTML converter as the
+                  // preview, so inline $…$ symbols and \textbf emphasis show.
+                  <div
+                    className="text-ink-2 [&_.katex]:text-ink"
+                    dangerouslySetInnerHTML={{ __html: renderLatex(explanation ?? "").html }}
+                  />
                 )}
               </div>
             )}

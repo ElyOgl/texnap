@@ -2,12 +2,15 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { invoke } from "@tauri-apps/api/core";
 import { en, type TKey } from "./en";
 import { fr } from "./fr";
+import { it } from "./it";
+import { de } from "./de";
+import { es } from "./es";
 import type { Entry, Lang } from "./types";
 
 export type { Lang } from "./types";
 export type { TKey } from "./en";
 
-const DICTS: Record<Lang, Record<TKey, Entry>> = { fr, en };
+const DICTS: Record<Lang, Record<TKey, Entry>> = { fr, en, it, de, es };
 
 type Params = Record<string, string | number>;
 
@@ -26,9 +29,12 @@ type I18n = {
 
 const I18nContext = createContext<I18n | null>(null);
 
-/** Guess the UI language from the OS locale when no preference is stored yet. */
+/** Guess the UI language from the OS locale when no preference is stored yet.
+ *  Matches on the primary subtag; anything unrecognized falls back to French. */
 export function detectLang(): Lang {
-  return (navigator.language || "").toLowerCase().startsWith("en") ? "en" : "fr";
+  const code = (navigator.language || "").toLowerCase().split("-")[0];
+  const supported: Record<string, Lang> = { en: "en", it: "it", de: "de", es: "es", fr: "fr" };
+  return supported[code] ?? "fr";
 }
 
 export function I18nProvider({ initialLang, children }: { initialLang: Lang; children: ReactNode }) {

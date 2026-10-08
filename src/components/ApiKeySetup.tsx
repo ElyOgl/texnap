@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ConfigStatus, ProviderInfo } from "../lib/providers";
 import { HintBar } from "./ui";
-import { useI18n } from "../lib/i18n";
+import { useI18n, type Lang } from "../lib/i18n";
 import { providerCopy } from "../lib/i18n/providers";
 
 type Props = {
@@ -471,11 +471,14 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
           <div className="relative">
             <select
               value={lang}
-              onChange={(e) => setLang(e.currentTarget.value as "fr" | "en")}
+              onChange={(e) => setLang(e.currentTarget.value as Lang)}
               className="w-full appearance-none rounded-lg border border-line-2 bg-surface-2 px-3 py-2 pr-9 text-[13px] text-ink outline-none focus:border-accent/50"
             >
               <option value="fr">Français</option>
               <option value="en">English</option>
+              <option value="it">Italiano</option>
+              <option value="de">Deutsch</option>
+              <option value="es">Español</option>
             </select>
             <svg
               className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-3"

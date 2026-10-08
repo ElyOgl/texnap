@@ -443,7 +443,7 @@ fn strip_prefix_note(line: &str) -> String {
 fn reasoning_provider(app: &AppHandle) -> Result<(provider::Provider, String), String> {
     config::fallback_chain(app)
         .into_iter()
-        .find(|(p, _)| *p != provider::Provider::SimpleTex)
+        .find(|(p, _)| *p != provider::Provider::SimpleTex && *p != provider::Provider::Local)
         .ok_or_else(|| "No reasoning LLM provider is configured — add a key in Settings (⌘,).".to_string())
 }
 
@@ -476,6 +476,7 @@ async fn ocr_explain(
     app: AppHandle,
     image_data_url: String,
     latex: String,
+    name: Option<String>,
     lang: String,
 ) -> Result<Explanation, String> {
     if cfg!(feature = "local_llm") && config::active_provider(&app) == provider::Provider::Local {
@@ -487,7 +488,7 @@ async fn ocr_explain(
     }
 
     let (provider, key) = reasoning_provider(&app)?;
-    let text = ocr::explain(provider, &image_data_url, &latex, &key, &lang)
+    let text = ocr::explain(provider, &image_data_url, &latex, name.as_deref(), &key, &lang)
         .await
         .map_err(|e| e.to_string())?;
 

@@ -36,8 +36,9 @@ choose, and no secrets are shipped in the app.
 - **Accuracy check** (optional) — a second pass asks the model whether the
   LaTeX faithfully matches the source image.
 
-> The app interface is currently in **French** (other languages coming in a
-> later update). This README is in English.
+> The app interface is available in **French, English, Italian, German, and
+> Spanish** — switch anytime in Settings (⌘,); it auto-detects your Mac's
+> language on first launch. This README is in English.
 
 ## Install
 
