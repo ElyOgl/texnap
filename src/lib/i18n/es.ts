@@ -110,6 +110,19 @@ export const es: Record<TKey, Entry> = {
   "apiKey.llm.fileModel": "Modelo",
   "apiKey.llm.fileVocab": "Vocabulario",
 
+  // Auto-update
+  "update.available": "Versión {version} disponible",
+  "update.action": "Actualizar",
+  "update.downloading": "Descargando… {pct} %",
+  "update.downloadingIndet": "Descargando…",
+  "update.restarting": "Reiniciando…",
+  "update.dismiss": "Más tarde",
+  "update.check": "Buscar actualizaciones",
+  "update.checking": "Buscando…",
+  "update.upToDate": "Actualizado",
+  "update.current": "Versión {version}",
+  "update.error": "Error al actualizar: {error}",
+
   // Tags
   "tags.remove": "Quitar la etiqueta {tag}",
   "tags.placeholder": "etiqueta…",

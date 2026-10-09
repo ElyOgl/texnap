@@ -8,6 +8,7 @@ import { LibraryPanel } from "./components/LibraryPanel";
 import { FichePanel } from "./components/FichePanel";
 import { HintBar } from "./components/ui";
 import { useImageCapture } from "./lib/useImageCapture";
+import { checkForUpdate, runUpdate, type PendingUpdate } from "./lib/updater";
 import { useI18n } from "./lib/i18n";
 import { isEditableTarget } from "./lib/dom";
 import { historyReducer, initialHistory } from "./lib/session";
@@ -32,6 +33,10 @@ function App() {
   const [savedEntry, setSavedEntry] = useState<{ id: string; imageId: string; tags: string[] } | null>(null);
   // F2: the selected library entries being turned into a fiche (PDF/.tex).
   const [sheetEntries, setSheetEntries] = useState<HistoryEntry[] | null>(null);
+  // Auto-update: a pending update found at launch (null = none / dismissed),
+  // and the in-progress download state driving the banner button.
+  const [update, setUpdate] = useState<PendingUpdate | null>(null);
+  const [updating, setUpdating] = useState<false | { pct: number | null }>(false);
 
   const refresh = useCallback(async () => {
     const [status, list] = await Promise.all([
@@ -47,6 +52,25 @@ function App() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Silent check for a newer release at launch; the banner only appears if one
+  // is found. No-ops in dev / offline (see lib/updater.ts).
+  useEffect(() => {
+    void checkForUpdate().then(setUpdate);
+  }, []);
+
+  const applyUpdate = useCallback(async () => {
+    if (!update) return;
+    setError(null);
+    setUpdating({ pct: null });
+    try {
+      await runUpdate(update, (pct) => setUpdating({ pct }));
+      // relaunch() replaces the process; nothing runs past here on success.
+    } catch (e) {
+      setUpdating(false);
+      setError(t("update.error", { error: String(e) }));
+    }
+  }, [update, t]);
 
   // A new capture resets the result view; the previous session is kept on the
   // undo stack so ⌘Z brings it (and its LaTeX) back.
@@ -158,6 +182,33 @@ function App() {
           </>
         )}
       </header>
+
+      {update && (
+        <div className="flex items-center gap-2 border-b border-accent/30 bg-accent/10 px-3.5 py-2 text-[12px] text-ink-2">
+          <span className="flex-1">{t("update.available", { version: update.version })}</span>
+          <button
+            onClick={() => void applyUpdate()}
+            disabled={!!updating}
+            className="rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-60"
+          >
+            {updating
+              ? updating.pct === 100
+                ? t("update.restarting")
+                : updating.pct === null
+                  ? t("update.downloadingIndet")
+                  : t("update.downloading", { pct: updating.pct })
+              : t("update.action")}
+          </button>
+          {!updating && (
+            <button
+              onClick={() => setUpdate(null)}
+              className="text-[11px] text-ink-3 hover:text-ink-2"
+            >
+              {t("update.dismiss")}
+            </button>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="border-b border-red-900 bg-red-950/60 px-3.5 py-2 text-[12px] text-red-300">

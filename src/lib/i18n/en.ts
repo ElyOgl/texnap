@@ -111,6 +111,19 @@ export const en = {
   "apiKey.llm.fileModel": "Model",
   "apiKey.llm.fileVocab": "Vocabulary",
 
+  // Auto-update
+  "update.available": "Version {version} available",
+  "update.action": "Update",
+  "update.downloading": "Downloading… {pct}%",
+  "update.downloadingIndet": "Downloading…",
+  "update.restarting": "Restarting…",
+  "update.dismiss": "Later",
+  "update.check": "Check for updates",
+  "update.checking": "Checking…",
+  "update.upToDate": "Up to date",
+  "update.current": "Version {version}",
+  "update.error": "Update failed: {error}",
+
   // Tags
   "tags.remove": "Remove tag {tag}",
   "tags.placeholder": "tag…",

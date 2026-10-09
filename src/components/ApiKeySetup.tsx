@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 import type { ConfigStatus, ProviderInfo } from "../lib/providers";
 import { HintBar } from "./ui";
 import { useI18n, type Lang } from "../lib/i18n";
 import { providerCopy } from "../lib/i18n/providers";
+import { checkForUpdate, runUpdate } from "../lib/updater";
 
 type Props = {
   onDone: () => void;
@@ -73,6 +75,11 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   // F6b: optional on-device explanation LLM (separate download). Only shown when
   // this build ships it (the lean release hides it).
   const [llmAvailable, setLlmAvailable] = useState(false);
+  // Manual update check (the launch check lives in App; this is the Settings
+  // affordance). `upd` is a short status string shown next to the button.
+  const [appVersion, setAppVersion] = useState<string>("");
+  const [updState, setUpdState] = useState<"idle" | "checking" | "uptodate" | "updating">("idle");
+  const [updPct, setUpdPct] = useState<number | null>(null);
   const [llmStatus, setLlmStatus] = useState<"unknown" | "not-downloaded" | "downloading" | "ready">("unknown");
   const [llmDlFiles, setLlmDlFiles] = useState<{ name: string; received: number; total: number }[]>([]);
   const [llmError, setLlmError] = useState<string | null>(null);
@@ -91,7 +98,24 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
       setSelected(status.activeProvider);
       setShortcutLabel(prettyShortcut(sc));
     })();
+    void getVersion().then(setAppVersion).catch(() => {});
   }, []);
+
+  const onCheckUpdates = async () => {
+    setUpdState("checking");
+    const u = await checkForUpdate();
+    if (!u) {
+      setUpdState("uptodate");
+      return;
+    }
+    setUpdState("updating");
+    setUpdPct(null);
+    try {
+      await runUpdate(u, setUpdPct); // relaunches on success
+    } catch {
+      setUpdState("idle");
+    }
+  };
 
   // Records the next modifier+key combo and saves it as the global shortcut.
   useEffect(() => {
@@ -493,6 +517,29 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             </svg>
           </div>
           <p className="mt-1.5 text-[11px] text-ink-3">{t("apiKey.langHint")}</p>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-line pt-3">
+          <span className="text-[11px] text-ink-3">
+            {appVersion ? t("update.current", { version: appVersion }) : ""}
+            {updState === "uptodate" && ` · ${t("update.upToDate")}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => void onCheckUpdates()}
+            disabled={updState === "checking" || updState === "updating"}
+            className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-60"
+          >
+            {updState === "checking"
+              ? t("update.checking")
+              : updState === "updating"
+                ? updPct === 100
+                  ? t("update.restarting")
+                  : updPct === null
+                    ? t("update.downloadingIndet")
+                    : t("update.downloading", { pct: updPct })
+                : t("update.check")}
+          </button>
         </div>
 
         {error && <p className="text-[12px] text-red-400">{error}</p>}

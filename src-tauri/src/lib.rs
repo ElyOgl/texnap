@@ -567,6 +567,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // In-app auto-update: checks the GitHub `latest.json` endpoint, verifies
+        // the minisign signature against the baked-in pubkey, and (on the user's
+        // click) downloads + relaunches. `process` provides the relaunch.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Register the stored (or default) global capture shortcut at start.
             let accel = config::current_shortcut(app.handle());
