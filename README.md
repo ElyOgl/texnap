@@ -207,6 +207,11 @@ shared by the desktop app (`src-tauri/`) and the CLI (`cli/`). `cargo test
 
 Built with Tauri 2 (Rust) + React + Vite + KaTeX.
 
+## Background story 
+
+The idea of making this app came to me, as a student in maths and economics, as teachers protect their pdfs against copy-pasting, 
+which is fair to avoid plagiat or any kind of stealing, but which kinda bothered me when I wanted to make Anki cards out of the those documents.
+
 
 <div align = "center">
 
