@@ -211,6 +211,7 @@ Built with Tauri 2 (Rust) + React + Vite + KaTeX.
 
 The idea of making this app came to me, as a student in maths and economics, as teachers protect their pdfs against copy-pasting, 
 which is fair to avoid plagiat or any kind of stealing, but which kinda bothered me when I wanted to make Anki cards out of the those documents.
+At the same moment, as I learned LateX, it was fun to write code myself for the first week or two, but it quickly became a huge time loss for me as I didn't needed to practice anymore my LateX skills. I thus wanted some kind of solution to both those problems and here comes Texnap (which comes from the contraction of Latex and Snapshot in a sens). 
 
 
 <div align = "center">
