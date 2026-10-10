@@ -5,12 +5,13 @@ import { fr } from "./fr";
 import { it } from "./it";
 import { de } from "./de";
 import { es } from "./es";
+import { pt } from "./pt";
 import type { Entry, Lang } from "./types";
 
 export type { Lang } from "./types";
 export type { TKey } from "./en";
 
-const DICTS: Record<Lang, Record<TKey, Entry>> = { fr, en, it, de, es };
+const DICTS: Record<Lang, Record<TKey, Entry>> = { fr, en, it, de, es, pt };
 
 type Params = Record<string, string | number>;
 
@@ -33,7 +34,7 @@ const I18nContext = createContext<I18n | null>(null);
  *  Matches on the primary subtag; anything unrecognized falls back to French. */
 export function detectLang(): Lang {
   const code = (navigator.language || "").toLowerCase().split("-")[0];
-  const supported: Record<string, Lang> = { en: "en", it: "it", de: "de", es: "es", fr: "fr" };
+  const supported: Record<string, Lang> = { en: "en", it: "it", de: "de", es: "es", pt: "pt", fr: "fr" };
   return supported[code] ?? "fr";
 }
 

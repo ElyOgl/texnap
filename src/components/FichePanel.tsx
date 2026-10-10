@@ -20,6 +20,7 @@ const LOCALES: Record<Lang, string> = {
   it: "it-IT",
   de: "de-DE",
   es: "es-ES",
+  pt: "pt-PT",
 };
 const localeOf = (lang: Lang) => LOCALES[lang];
 // babel package option per UI language (ngerman = modern German orthography).
@@ -29,6 +30,7 @@ const BABEL: Record<Lang, string> = {
   it: "italian",
   de: "ngerman",
   es: "spanish",
+  pt: "portuguese",
 };
 const today = (lang: Lang) =>
   new Date().toLocaleDateString(localeOf(lang), { day: "numeric", month: "long", year: "numeric" });

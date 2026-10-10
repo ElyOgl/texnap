@@ -48,6 +48,7 @@ const JUST_NOW: Record<Lang, string> = {
   it: "proprio ora",
   de: "gerade eben",
   es: "ahora mismo",
+  pt: "agora mesmo",
 };
 
 export function relativeTime(ms: number, lang: Lang = "fr"): string {

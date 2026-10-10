@@ -4,10 +4,11 @@ import { fr } from "./fr";
 import { it as itDict } from "./it";
 import { de } from "./de";
 import { es } from "./es";
+import { pt } from "./pt";
 import { providerCopy } from "./providers";
 import type { Entry, Lang } from "./types";
 
-const DICTS: Record<Lang, Record<keyof typeof en, Entry>> = { fr, en, it: itDict, de, es };
+const DICTS: Record<Lang, Record<keyof typeof en, Entry>> = { fr, en, it: itDict, de, es, pt };
 
 // A tiny standalone copy of the provider's fill/plural logic, so the test
 // doesn't need to mount React to exercise interpolation and plurals.
@@ -23,13 +24,13 @@ function resolve(lang: Lang, key: keyof typeof en, params?: Record<string, strin
 }
 
 describe("i18n dictionaries", () => {
-  const nonCanonical: Lang[] = ["fr", "it", "de", "es"];
+  const nonCanonical: Lang[] = ["fr", "it", "de", "es", "pt"];
 
   it.each(nonCanonical)("%s covers exactly the en key set", (lang) => {
     expect(Object.keys(DICTS[lang]).sort()).toEqual(Object.keys(en).sort());
   });
 
-  it.each(["fr", "en", "it", "de", "es"] as Lang[])("%s has provider copy for every provider", (lang) => {
+  it.each(["fr", "en", "it", "de", "es", "pt"] as Lang[])("%s has provider copy for every provider", (lang) => {
     expect(Object.keys(providerCopy[lang]).sort()).toEqual(Object.keys(providerCopy.en).sort());
   });
 

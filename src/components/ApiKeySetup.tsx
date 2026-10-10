@@ -501,6 +501,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               <option value="it">Italiano</option>
               <option value="de">Deutsch</option>
               <option value="es">Español</option>
+              <option value="pt">Português</option>
             </select>
             <svg
               className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-3"

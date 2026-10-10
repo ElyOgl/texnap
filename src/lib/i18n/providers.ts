@@ -104,4 +104,22 @@ export const providerCopy: Record<Lang, Record<string, ProviderCopy>> = {
       label: "Local (sin conexión)",
     },
   },
+  pt: {
+    gemini: { note: "Modelo de visão de uso geral, plano gratuito generoso." },
+    simpletex: {
+      note: "OCR de fórmulas dedicado, 2000 chamadas/dia gratuitas. Uma fórmula por imagem; servidores na China.",
+      keyPlaceholder: "o seu token UAT do SimpleTex",
+    },
+    openrouter: {
+      note: "Encaminha para modelos de visão gratuitos. 50 pedidos/dia gratuitos, 1000/dia após um carregamento único de 10 $.",
+    },
+    openai: {
+      note: "Sem plano gratuito, mas alguns cêntimos por mês com o volume de uma captura. Muito fiável na saída exata.",
+    },
+    anthropic: { note: "Sem plano gratuito permanente, apenas créditos de teste." },
+    local: {
+      note: "Funciona no seu Mac — sem chave, sem quota, sem ligação. Transfira um modelo (~600 MB) uma única vez.",
+      label: "Local (offline)",
+    },
+  },
 };
