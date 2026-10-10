@@ -25,7 +25,6 @@ v1 scope is **isolated formulas** (Mathpix-Snip style), not full mixed text+math
 
 ## Where things live
 
-- Code + repo: `/Users/elyo/Desktop/TRINITY/texnap/` — private `github.com/ElyOgl/texnap`, branch `main`.
   - `src/` — React/TS frontend (Vite).
   - `src-tauri/` — a **Cargo workspace** (root manifest is also the Tauri app package):
     - `core/` — **`texnap-core`**, the Tauri-free OCR engine: `provider.rs` (the `Provider` enum), `ocr/` (one module per provider: `anthropic.rs`, `gemini.rs`, `openai_compat.rs`, `simpletex.rs`, dispatched from `mod.rs`), `capture.rs` (file→base64), `config.rs` (pure key-resolution rules + the stored `config.json` shape). Shared by the app and the CLI.
@@ -55,7 +54,3 @@ npm run tauri build  # produces the .app / .dmg
 - No `bun` on this machine — always `npm`.
 - Rust toolchain installed 2026-09-23 via `rustup` specifically for this project (`~/.cargo/`, stable channel). Xcode Command Line Tools were already present (required by Tauri on macOS).
 - `rustup`'s installer wrote the `cargo` PATH sourcing line to `~/.profile`, which **zsh (this Mac's default shell) never reads.** Symptom: `npm run tauri dev` fails with `failed to run 'cargo metadata' ... No such file or directory` in a normal terminal, even though `cargo` works fine in contexts that explicitly source `~/.cargo/env`. Fixed 2026-09-24 by adding `. "$HOME/.cargo/env"` to `~/.zshrc` directly — a **new** terminal tab is required after that fix (existing tabs keep the old PATH).
-
-## Working session plan
-
-See `Trinity/TEXNAP/ROADMAP.md` for the phased plan (P0–P4) and per-phase verification checklists. Each phase is meant to be one working session with a clear gate before moving to the next.
