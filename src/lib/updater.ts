@@ -1,10 +1,8 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import type { TKey } from "./i18n";
 
-// Thin wrappers over the Tauri updater. Everything is defensive: in a dev/non-
-// Tauri context (or when the endpoint/signature isn't reachable) these resolve
-// to "no update" instead of throwing, so `npm run dev` and first-run are never
-// broken by the updater.
+// Thin wrappers over the Tauri updater.
 
 export type PendingUpdate = {
   version: string;
@@ -13,17 +11,34 @@ export type PendingUpdate = {
   handle: Update;
 };
 
-/** Returns a pending update, or null when up to date / unavailable. */
-export async function checkForUpdate(): Promise<PendingUpdate | null> {
+// A check distinguishes three outcomes so callers can tell "up to date" from a
+// real failure (offline, endpoint 5xx, bad signature) — the launch path ignores
+// everything but `update`, while Settings surfaces `error` instead of silently
+// claiming "up to date".
+export type UpdateCheck =
+  | { kind: "update"; update: PendingUpdate }
+  | { kind: "current" }
+  | { kind: "error"; error: string };
+
+export async function checkForUpdate(): Promise<UpdateCheck> {
   try {
     const update = await check();
-    if (!update) return null;
-    return { version: update.version, notes: update.body ?? "", handle: update };
-  } catch {
-    // No updater in this context, offline, or endpoint unreachable — treat as
-    // "nothing to do" rather than surfacing a scary error on launch.
-    return null;
+    if (!update) return { kind: "current" };
+    return {
+      kind: "update",
+      update: { version: update.version, notes: update.body ?? "", handle: update },
+    };
+  } catch (e) {
+    // No updater in this context (dev), offline, or endpoint unreachable.
+    return { kind: "error", error: String(e) };
   }
+}
+
+/** Shared label for the download-progress button, used by the banner and Settings. */
+export function updateProgressLabel(t: (k: TKey, p?: Record<string, string | number>) => string, pct: number | null): string {
+  if (pct === 100) return t("update.restarting");
+  if (pct === null) return t("update.downloadingIndet");
+  return t("update.downloading", { pct });
 }
 
 /**

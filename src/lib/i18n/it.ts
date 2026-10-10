@@ -122,6 +122,7 @@ export const it: Record<TKey, Entry> = {
   "update.upToDate": "Aggiornato",
   "update.current": "Versione {version}",
   "update.error": "Aggiornamento non riuscito: {error}",
+  "update.failed": "Verifica non riuscita",
 
   // Tags
   "tags.remove": "Rimuovi il tag {tag}",

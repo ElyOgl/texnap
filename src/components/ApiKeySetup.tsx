@@ -6,7 +6,7 @@ import type { ConfigStatus, ProviderInfo } from "../lib/providers";
 import { HintBar } from "./ui";
 import { useI18n, type Lang } from "../lib/i18n";
 import { providerCopy } from "../lib/i18n/providers";
-import { checkForUpdate, runUpdate } from "../lib/updater";
+import { checkForUpdate, runUpdate, updateProgressLabel } from "../lib/updater";
 
 type Props = {
   onDone: () => void;
@@ -78,7 +78,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
   // Manual update check (the launch check lives in App; this is the Settings
   // affordance). `upd` is a short status string shown next to the button.
   const [appVersion, setAppVersion] = useState<string>("");
-  const [updState, setUpdState] = useState<"idle" | "checking" | "uptodate" | "updating">("idle");
+  const [updState, setUpdState] = useState<"idle" | "checking" | "uptodate" | "updating" | "error">("idle");
   const [updPct, setUpdPct] = useState<number | null>(null);
   const [llmStatus, setLlmStatus] = useState<"unknown" | "not-downloaded" | "downloading" | "ready">("unknown");
   const [llmDlFiles, setLlmDlFiles] = useState<{ name: string; received: number; total: number }[]>([]);
@@ -103,17 +103,15 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
 
   const onCheckUpdates = async () => {
     setUpdState("checking");
-    const u = await checkForUpdate();
-    if (!u) {
-      setUpdState("uptodate");
-      return;
-    }
+    const r = await checkForUpdate();
+    if (r.kind === "current") return setUpdState("uptodate");
+    if (r.kind === "error") return setUpdState("error");
     setUpdState("updating");
     setUpdPct(null);
     try {
-      await runUpdate(u, setUpdPct); // relaunches on success
+      await runUpdate(r.update, setUpdPct); // relaunches on success
     } catch {
-      setUpdState("idle");
+      setUpdState("error");
     }
   };
 
@@ -523,6 +521,9 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
           <span className="text-[11px] text-ink-3">
             {appVersion ? t("update.current", { version: appVersion }) : ""}
             {updState === "uptodate" && ` · ${t("update.upToDate")}`}
+            {updState === "error" && (
+              <span className="text-red-400"> · {t("update.failed")}</span>
+            )}
           </span>
           <button
             type="button"
@@ -533,11 +534,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             {updState === "checking"
               ? t("update.checking")
               : updState === "updating"
-                ? updPct === 100
-                  ? t("update.restarting")
-                  : updPct === null
-                    ? t("update.downloadingIndet")
-                    : t("update.downloading", { pct: updPct })
+                ? updateProgressLabel(t, updPct)
                 : t("update.check")}
           </button>
         </div>

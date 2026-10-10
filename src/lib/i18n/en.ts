@@ -123,6 +123,7 @@ export const en = {
   "update.upToDate": "Up to date",
   "update.current": "Version {version}",
   "update.error": "Update failed: {error}",
+  "update.failed": "Update check failed",
 
   // Tags
   "tags.remove": "Remove tag {tag}",
