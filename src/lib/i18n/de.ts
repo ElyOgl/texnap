@@ -46,6 +46,7 @@ export const de: Record<TKey, Entry> = {
   "apiKey.local.introPost": ". Lade das Modell (~600 MB) einmalig herunter.",
   "apiKey.local.download": "Modell herunterladen (~600 MB)",
   "apiKey.local.autoHint": "Offline wechselt texnap automatisch zu diesem Modell.",
+  "apiKey.local.section": "Offline-Modell",
   "apiKey.file.encoder": "Encoder",
   "apiKey.file.decoder": "Decoder",
   "apiKey.file.vocab": "Vokabular",

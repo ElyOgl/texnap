@@ -47,6 +47,7 @@ export const en = {
   "apiKey.local.introPost": ". Download a model (~600 MB) once.",
   "apiKey.local.download": "Download the model (~600 MB)",
   "apiKey.local.autoHint": "When offline, texnap switches to this model automatically.",
+  "apiKey.local.section": "Offline model",
   "apiKey.file.encoder": "Encoder",
   "apiKey.file.decoder": "Decoder",
   "apiKey.file.vocab": "Vocabulary",

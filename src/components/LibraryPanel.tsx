@@ -110,12 +110,12 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
       <button
         key={entry.id}
         onClick={() => toggleSelected(entry.id)}
-        className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left ${
+        className={`flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-colors ${
           isSel ? "border-accent bg-accent/10" : "border-line bg-surface-2 hover:border-line-2"
         }`}
       >
         <span
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
             isSel ? "border-accent bg-accent text-accent-ink" : "border-line-2 text-transparent"
           }`}
         >
@@ -123,7 +123,7 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
             <path d="M5 12l5 5L20 7" />
           </svg>
         </span>
-        <img src={entry.thumbnail} alt="" className="h-9 w-14 shrink-0 rounded bg-paper object-contain" />
+        <img src={entry.thumbnail} alt="" className="h-9 w-14 shrink-0 rounded border border-line bg-paper object-contain" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-mono text-[11px] text-ink-2">{entry.latex}</span>
           <span className="truncate text-[10.5px] text-ink-3">
@@ -140,13 +140,13 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
     ) : (
     <div
       key={entry.id}
-      className="group flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-2 hover:border-line-2"
+      className="group flex items-start gap-3 rounded-xl border border-line bg-surface-2 p-2 transition-colors hover:border-line-2 hover:bg-surface-3"
     >
       <button onClick={() => onOpen(entry)} className="shrink-0" title={t("library.open")}>
         <img
           src={entry.thumbnail}
           alt=""
-          className="h-10 w-16 rounded bg-paper object-contain"
+          className={`h-10 w-16 rounded border bg-paper object-contain ${entry.pinned ? "border-accent/60" : "border-line"}`}
         />
       </button>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -227,14 +227,22 @@ export function LibraryPanel({ onOpen, onClose, onCreateSheet }: Props) {
           </div>
         )}
 
-        <input
-          ref={searchRef}
-          value={query}
-          onChange={(e) => setQuery(e.currentTarget.value)}
-          placeholder={t("library.search")}
-          spellCheck={false}
-          className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent/50"
-        />
+        <div className="relative">
+          <svg
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3"
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            placeholder={t("library.search")}
+            spellCheck={false}
+            className="w-full rounded-lg border border-line bg-surface-2 py-2 pl-8 pr-3 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent/50"
+          />
+        </div>
 
         {allTags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">

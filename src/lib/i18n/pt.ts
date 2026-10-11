@@ -46,6 +46,7 @@ export const pt: Record<TKey, Entry> = {
   "apiKey.local.introPost": ". Transfira um modelo (~600 MB) uma única vez.",
   "apiKey.local.download": "Transferir o modelo (~600 MB)",
   "apiKey.local.autoHint": "Sem ligação, o texnap muda automaticamente para este modelo.",
+  "apiKey.local.section": "Modelo offline",
   "apiKey.file.encoder": "Codificador",
   "apiKey.file.decoder": "Descodificador",
   "apiKey.file.vocab": "Vocabulário",

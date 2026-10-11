@@ -139,42 +139,63 @@ export function FichePanel({ entries, onClose }: Props) {
           value={title}
           onChange={(e) => setTitle(e.currentTarget.value)}
           placeholder={t("fiche.titlePlaceholder")}
-          className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink outline-none focus:border-accent/50"
+          className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink outline-none transition-colors focus:border-accent/50"
         />
-        <div className="flex items-center gap-4 text-[11px] text-ink-2">
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.currentTarget.checked)} />
+        <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-ink-2">
+          <button
+            type="button"
+            onClick={() => setGrouped((g) => !g)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 transition-colors ${
+              grouped ? "bg-accent text-accent-ink" : "bg-surface-3 text-ink-2 hover:text-ink"
+            }`}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 8h7l2 2h9M3 8v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8" />
+            </svg>
             {t("fiche.groupByTag")}
-          </label>
-          <label className="flex items-center gap-1.5">
-            {t("fiche.columns")}
-            <select
-              value={cols}
-              onChange={(e) => setCols(Number(e.currentTarget.value))}
-              className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-ink outline-none"
-            >
-              <option value={1}>1</option>
-              <option value={2}>2</option>
-              <option value={3}>3</option>
-            </select>
-          </label>
+          </button>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-ink-3">{t("fiche.columns")}</span>
+            <div className="flex rounded-lg bg-surface-3 p-0.5">
+              {[1, 2, 3].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setCols(n)}
+                  className={`rounded-md px-2.5 py-0.5 transition-colors ${
+                    cols === n ? "bg-accent text-accent-ink" : "text-ink-3 hover:text-ink"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => void exportTex()}
-              className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink"
+              className="inline-flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 transition hover:text-ink active:scale-[0.98]"
             >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" />
+              </svg>
               {savedTex ? t("fiche.texSaved") : t("fiche.exportTex")}
             </button>
             <button
               onClick={() => void exportPdf()}
               title={t("fiche.exportPdfTitle")}
-              className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
+              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
             >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+              </svg>
               {t("fiche.exportPdf")}
             </button>
           </div>
-          {pdfError && <p className="text-[11px] text-red-400">{t("fiche.pdfError", { error: pdfError })}</p>}
         </div>
+        {pdfError && <p className="text-[11px] text-red-400">{t("fiche.pdfError", { error: pdfError })}</p>}
       </div>
 
       {/* The sheet — the only thing that prints (see @media print in App.css) */}

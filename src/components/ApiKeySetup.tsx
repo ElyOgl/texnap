@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
@@ -38,6 +38,26 @@ function accelFromEvent(e: KeyboardEvent): { accel: string; label: string } | nu
     label: [...mods.map((m) => SYMBOLS[m] ?? m), labelKey].join(" "),
   };
 }
+
+// A settings group as a card with a small coral section-icon + title.
+function Section({ icon, title, children }: { icon: ReactNode; title: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-xl bg-surface-3 p-3 transition-colors hover:border-line-2">
+      <h2 className="mb-2.5 flex items-center gap-2 text-[12px] font-medium text-ink">
+        <span className="text-accent">{icon}</span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+const SI = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+const IconChip = () => (<svg {...SI}><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 2v2M15 2v2M9 20v2M15 20v2M20 9h2M20 14h2M2 9h2M2 14h2" /></svg>);
+const IconDownload = () => (<svg {...SI}><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>);
+const IconKeyboard = () => (<svg {...SI}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M8 16h8" /></svg>);
+const IconGlobe = () => (<svg {...SI}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>);
+const IconRefresh = () => (<svg {...SI}><path d="M3 12a9 9 0 0 1 15-6.5L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.5L3 16M3 21v-5h5" /></svg>);
 
 export function ApiKeySetup({ onDone, onCancel }: Props) {
   const { t, lang, setLang } = useI18n();
@@ -261,14 +281,13 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-3.5">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3.5">
         {onCancel && (
           <button onClick={onCancel} className="-mb-1 self-start text-[11px] text-ink-3 hover:text-ink-2">
             {t("common.back")}
           </button>
         )}
-        <div>
-          <label className="mb-1.5 block text-[11px] text-ink-3">{t("apiKey.providerLabel")}</label>
+        <Section icon={<IconChip />} title={t("apiKey.providerLabel")}>
           <div className="relative">
             <select
               value={selected}
@@ -277,7 +296,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                 setKey("");
                 setError(null);
               }}
-              className="w-full appearance-none rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5 pr-9 text-[13px] text-ink outline-none focus:border-accent/50"
+              className="w-full appearance-none rounded-lg border border-line bg-surface-3 px-3 py-2.5 pr-9 text-[13px] text-ink outline-none focus:border-accent/50"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -300,16 +319,16 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             </svg>
           </div>
           {info && (
-            <p className="mt-1.5 text-[11px] text-ink-3">
+            <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
               {providerCopy[lang][info.id]?.note ?? info.note}
             </p>
           )}
-        </div>
+        </Section>
 
         {isLocal ? (
-          <div>
+          <Section icon={<IconDownload />} title={t("apiKey.local.section")}>
             {localStatus === "ready" ? (
-              <div className="flex items-center gap-2.5 rounded-lg border border-ok/40 bg-surface-2 p-3">
+              <div className="flex items-center gap-2.5 rounded-lg border border-ok/40 bg-surface-3 p-3">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ok">
                   <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" />
                 </svg>
@@ -326,7 +345,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                 </button>
               </div>
             ) : localStatus === "downloading" ? (
-              <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 p-3">
+              <div className="flex flex-col gap-3 rounded-lg bg-surface-3 p-3">
                 <span className="text-[12px] text-ink-2">{t("apiKey.local.downloading")}</span>
                 {dlFiles.map((f) => (
                   <div key={f.name} className="flex flex-col gap-1">
@@ -336,7 +355,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                         {f.total ? t("apiKey.mbProgress", { received: mb(f.received), total: mb(f.total) }) : "…"}
                       </span>
                     </div>
-                    <div className="h-1 overflow-hidden rounded bg-surface-3">
+                    <div className="h-1 overflow-hidden rounded bg-surface">
                       <div
                         className="h-full bg-accent transition-[width] duration-150"
                         style={{ width: f.total ? `${Math.round((f.received / f.total) * 100)}%` : "0%" }}
@@ -346,7 +365,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface-2 p-3">
+              <div className="flex flex-col gap-2.5 rounded-lg bg-surface-3 p-3">
                 <span className="text-[12px] leading-relaxed text-ink-2">
                   {t("apiKey.local.introPre")}
                   <span className="text-ink">{t("apiKey.local.introEm")}</span>
@@ -370,14 +389,14 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             <div className="mt-3 border-t border-line pt-3">
               <div className="mb-1.5 text-[11px] text-ink-3">{t("apiKey.llm.title")}</div>
               {llmStatus === "ready" ? (
-                <div className="flex items-center gap-2.5 rounded-lg border border-ok/40 bg-surface-2 p-3">
+                <div className="flex items-center gap-2.5 rounded-lg border border-ok/40 bg-surface-3 p-3">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ok">
                     <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" />
                   </svg>
                   <span className="text-[12px] text-ink">{t("apiKey.llm.ready")}</span>
                 </div>
               ) : llmStatus === "downloading" ? (
-                <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 p-3">
+                <div className="flex flex-col gap-3 rounded-lg bg-surface-3 p-3">
                   <span className="text-[12px] text-ink-2">{t("apiKey.llm.downloading")}</span>
                   {llmDlFiles.map((f) => (
                     <div key={f.name} className="flex flex-col gap-1">
@@ -387,7 +406,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                           {f.total ? t("apiKey.mbProgress", { received: mb(f.received), total: mb(f.total) }) : "…"}
                         </span>
                       </div>
-                      <div className="h-1 overflow-hidden rounded bg-surface-3">
+                      <div className="h-1 overflow-hidden rounded bg-surface">
                         <div
                           className="h-full bg-accent transition-[width] duration-150"
                           style={{ width: f.total ? `${Math.round((f.received / f.total) * 100)}%` : "0%" }}
@@ -397,7 +416,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface-2 p-3">
+                <div className="flex flex-col gap-2.5 rounded-lg bg-surface-3 p-3">
                   <span className="text-[12px] leading-relaxed text-ink-2">{t("apiKey.llm.intro")}</span>
                   <button
                     type="button"
@@ -411,13 +430,17 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               {llmError && <p className="mt-1.5 text-[11px] text-red-400">{llmError}</p>}
             </div>
             )}
-          </div>
+          </Section>
         ) : (
-        <div>
-          <label className="mb-1.5 block text-[11px] text-ink-3">
-            {t("apiKey.keyLabel")}
-            {alreadySaved && <span className="text-ink-2">{t("apiKey.keyAlreadySaved")}</span>}
-          </label>
+        <Section
+          icon={<svg {...SI}><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
+          title={
+            <>
+              {t("apiKey.keyLabel")}
+              {alreadySaved && <span className="font-normal text-ink-3">{t("apiKey.keyAlreadySaved")}</span>}
+            </>
+          }
+        >
           <div className="relative">
             <input
               type={show ? "text" : "password"}
@@ -429,7 +452,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                   : providerCopy[lang][selected]?.keyPlaceholder ?? info?.keyPlaceholder
               }
               spellCheck={false}
-              className="w-full rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5 pr-16 font-mono text-[12px] text-ink outline-none focus:border-accent/50"
+              className="w-full rounded-lg border border-line bg-surface-3 px-3 py-2.5 pr-16 font-mono text-[12px] text-ink outline-none focus:border-accent/50"
             />
             <button
               type="button"
@@ -447,13 +470,12 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
             )}
             {t("apiKey.keyHintSuffix")}
           </p>
-        </div>
+        </Section>
         )}
 
-        <div className="border-t border-line pt-3">
-          <label className="mb-1.5 block text-[11px] text-ink-3">{t("apiKey.shortcutLabel")}</label>
+        <Section icon={<IconKeyboard />} title={t("apiKey.shortcutLabel")}>
           <div className="flex items-center gap-2">
-            <span className="rounded-md border border-line-2 bg-surface-2 px-2.5 py-1.5 font-mono text-[12px] text-ink">
+            <span className="rounded-md border border-line bg-surface-3 px-2.5 py-1.5 font-mono text-[12px] text-ink">
               {recording ? t("apiKey.shortcutRecording") : shortcutLabel ?? "—"}
             </span>
             <button
@@ -462,24 +484,23 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                 setShortcutError(null);
                 setRecording((r) => !r);
               }}
-              className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink"
+              className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 transition hover:text-ink active:scale-[0.98]"
             >
               {recording ? t("common.cancel") : t("apiKey.shortcutEdit")}
             </button>
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-3">
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
             {recording ? t("apiKey.shortcutHintRecording") : t("apiKey.shortcutHintIdle")}
           </p>
           {shortcutError && <p className="mt-1 text-[11px] text-red-400">{shortcutError}</p>}
-        </div>
+        </Section>
 
-        <div className="border-t border-line pt-3">
-          <label className="mb-1.5 block text-[11px] text-ink-3">{t("apiKey.langLabel")}</label>
+        <Section icon={<IconGlobe />} title={t("apiKey.langLabel")}>
           <div className="relative">
             <select
               value={lang}
               onChange={(e) => setLang(e.currentTarget.value as Lang)}
-              className="w-full appearance-none rounded-lg border border-line-2 bg-surface-2 px-3 py-2 pr-9 text-[13px] text-ink outline-none focus:border-accent/50"
+              className="w-full appearance-none rounded-lg border border-line bg-surface-3 px-3 py-2 pr-9 text-[13px] text-ink outline-none focus:border-accent/50"
             >
               <option value="fr">Français</option>
               <option value="en">English</option>
@@ -500,22 +521,21 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
               <path d="m6 9 6 6 6-6" />
             </svg>
           </div>
-          <p className="mt-1.5 text-[11px] text-ink-3">{t("apiKey.langHint")}</p>
-        </div>
+          <p className="mt-2 text-[11px] text-ink-3">{t("apiKey.langHint")}</p>
+        </Section>
 
-        <div className="flex items-center justify-between border-t border-line pt-3">
-          <span className="text-[11px] text-ink-3">
+        <section className="flex items-center justify-between rounded-xl border border-line bg-surface-2 p-3 transition-colors hover:border-line-2">
+          <span className="flex items-center gap-2 text-[11px] text-ink-2">
+            <span className="text-accent"><IconRefresh /></span>
             {appVersion ? t("update.current", { version: appVersion }) : ""}
-            {updState === "uptodate" && ` · ${t("update.upToDate")}`}
-            {updState === "error" && (
-              <span className="text-red-400"> · {t("update.failed")}</span>
-            )}
+            {updState === "uptodate" && <span className="text-ok"> · {t("update.upToDate")}</span>}
+            {updState === "error" && <span className="text-red-400"> · {t("update.failed")}</span>}
           </span>
           <button
             type="button"
             onClick={() => void onCheckUpdates()}
             disabled={updState === "checking" || updState === "updating"}
-            className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-60"
+            className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 transition hover:text-ink active:scale-[0.98] disabled:opacity-60"
           >
             {updState === "checking"
               ? t("update.checking")
@@ -523,7 +543,7 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
                 ? updateProgressLabel(t, updPct)
                 : t("update.check")}
           </button>
-        </div>
+        </section>
 
         {error && <p className="text-[12px] text-red-400">{error}</p>}
 
