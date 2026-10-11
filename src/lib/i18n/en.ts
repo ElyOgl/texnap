@@ -27,6 +27,9 @@ export const en = {
   "captureZone.pastePost": "to paste from the clipboard",
   "captureZone.changeEngine": "Change OCR engine",
   "captureZone.ready": "Ready",
+  "captureZone.paste": "paste",
+  "captureZone.drag": "drag",
+  "captureZone.snip": "snip",
 
   // Settings / API key setup
   "apiKey.loading": "Loading providers…",

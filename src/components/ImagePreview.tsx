@@ -257,8 +257,13 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
         </div>
 
         {loading && (
-          <div className="flex justify-center py-6">
-            <WanderingEyes label={t("preview.transcribing")} />
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-center py-4">
+              <WanderingEyes label={t("preview.transcribing")} />
+            </div>
+            {/* Shimmer placeholders so the result doesn't pop in abruptly. */}
+            <div className="skeleton h-16 rounded-lg" />
+            <div className="skeleton h-20 rounded-lg" />
           </div>
         )}
 
@@ -289,7 +294,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
         )}
 
         {!loading && latex && (
-          <>
+          <div className="result-in flex flex-col gap-3">
             {name && name.name && (
               <div className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-2 px-3 py-2">
                 <svg
@@ -347,8 +352,52 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-ink-3">
+            {/* Action toolbar: Copy is the single primary; Check + Plain-language
+                are secondary. Rerun stays on ⏎ (see the hint bar). */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void copy()}
+                className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="11" height="11" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                {t("preview.copy")}
+                <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘C</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void verify()}
+                disabled={verifying}
+                className="flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 transition hover:text-ink active:scale-[0.98] disabled:opacity-50"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m1.5 12 4 4L10 9" />
+                  <path d="m13 12 4 4 5.5-8" />
+                </svg>
+                {verifying ? t("preview.verifying") : t("preview.verify")}
+              </button>
+              {explainSupported && (
+                <button
+                  type="button"
+                  onClick={() => void explain()}
+                  disabled={explaining || !explainReady}
+                  title={explainReady ? t("explain.title") : t("explain.unavailable")}
+                  className="ml-auto flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 transition hover:text-ink active:scale-[0.98] disabled:opacity-50"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {explaining ? t("explain.loading") : t("explain.button")}
+                </button>
+              )}
+            </div>
+
+            {/* Provenance + verdict — quiet, below the toolbar. */}
+            <div className="flex flex-col gap-1 text-[11px]">
+              <span className="text-ink-3">
                 {copied ? (
                   <span className="text-ok">{t("preview.copied")}</span>
                 ) : fellBackFrom ? (
@@ -363,43 +412,15 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                   </>
                 )}
               </span>
-              <button
-                type="button"
-                onClick={() => void copy()}
-                className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
-              >
-                {t("preview.copy")}
-                <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘C</span>
-              </button>
-            </div>
-
-            {onEntryTags && (
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 text-[11px] text-ink-3">{t("preview.tags")}</span>
-                <TagEditor tags={entryTags ?? []} onChange={onEntryTags} compact />
-              </div>
-            )}
-
-            {/* Optional accuracy check: a second LLM pass comparing the render to
-                the source image. Off the critical path — user triggers it. */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void verify()}
-                disabled={verifying}
-                className="rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
-              >
-                {verifying ? t("preview.verifying") : t("preview.verify")}
-              </button>
               {verdict && (
                 <span
-                  className={`text-[11px] ${
+                  className={
                     verdict.level === "match"
                       ? "text-ok"
                       : verdict.level === "mismatch"
                         ? "text-red-400"
                         : "text-amber-400/90"
-                  }`}
+                  }
                 >
                   {verdict.level === "match"
                     ? t("preview.verdictMatch")
@@ -410,23 +431,14 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                         : verdict.note}
                 </span>
               )}
-              {/* Plain-language reformulation — bottom-right. Hidden when the
-                  active provider can't offer it (e.g. local in the lean build). */}
-              {explainSupported && (
-                <button
-                  type="button"
-                  onClick={() => void explain()}
-                  disabled={explaining || !explainReady}
-                  title={explainReady ? t("explain.title") : t("explain.unavailable")}
-                  className="ml-auto flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 hover:text-ink disabled:opacity-50"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {explaining ? t("explain.loading") : t("explain.button")}
-                </button>
-              )}
             </div>
+
+            {onEntryTags && (
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-[11px] text-ink-3">{t("preview.tags")}</span>
+                <TagEditor tags={entryTags ?? []} onChange={onEntryTags} compact />
+              </div>
+            )}
 
             {(explanation || explainError) && (
               <div className="rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed">
@@ -442,7 +454,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 

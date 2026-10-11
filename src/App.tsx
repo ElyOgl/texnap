@@ -9,6 +9,7 @@ import { FichePanel } from "./components/FichePanel";
 import { HintBar } from "./components/ui";
 import { useImageCapture } from "./lib/useImageCapture";
 import { checkForUpdate, runUpdate, updateProgressLabel, type PendingUpdate } from "./lib/updater";
+import { prettyShortcut, captureKeyGlyph } from "./lib/shortcut";
 import { useI18n } from "./lib/i18n";
 import { isEditableTarget } from "./lib/dom";
 import { historyReducer, initialHistory } from "./lib/session";
@@ -37,6 +38,9 @@ function App() {
   // and the in-progress download state driving the banner button.
   const [update, setUpdate] = useState<PendingUpdate | null>(null);
   const [updating, setUpdating] = useState<false | { pct: number | null }>(false);
+  // Layout-aware capture shortcut label (⌃⌘M on QWERTY, ⌃⌘, on AZERTY), shown
+  // on the idle "snip" chip. Resolved once at launch.
+  const [captureShortcut, setCaptureShortcut] = useState<string>("");
 
   const refresh = useCallback(async () => {
     const [status, list] = await Promise.all([
@@ -59,6 +63,21 @@ function App() {
     void checkForUpdate().then((r) => {
       if (r.kind === "update") setUpdate(r.update);
     });
+  }, []);
+
+  // Resolve the capture shortcut label once, layout-aware (⌃⌘M / ⌃⌘,).
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [accel, glyph] = await Promise.all([
+          invoke<string>("get_shortcut"),
+          captureKeyGlyph(),
+        ]);
+        setCaptureShortcut(prettyShortcut(accel, glyph));
+      } catch {
+        /* non-Tauri/dev: leave blank, chip falls back to a generic label */
+      }
+    })();
   }, []);
 
   const applyUpdate = useCallback(async () => {
@@ -186,7 +205,7 @@ function App() {
       </header>
 
       {update && configured === true && !showSettings && (
-        <div className="flex items-center gap-2 border-b border-accent/30 bg-accent/10 px-3.5 py-2 text-[12px] text-ink-2">
+        <div className="banner-in flex items-center gap-2 border-b border-accent/30 bg-accent/10 px-3.5 py-2 text-[12px] text-ink-2">
           <span className="flex-1">{t("update.available", { version: update.version })}</span>
           <button
             onClick={() => void applyUpdate()}
@@ -266,6 +285,7 @@ function App() {
                 isDragging={isDragging}
                 onPick={() => void pickFile()}
                 providerLabel={activeProviderLabel}
+                captureShortcut={captureShortcut}
                 onOpenSettings={() => setShowSettings(true)}
               />
             </div>

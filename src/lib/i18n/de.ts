@@ -26,6 +26,9 @@ export const de: Record<TKey, Entry> = {
   "captureZone.pastePost": "zum Einfügen aus der Zwischenablage",
   "captureZone.changeEngine": "OCR-Engine wechseln",
   "captureZone.ready": "Bereit",
+  "captureZone.paste": "einfügen",
+  "captureZone.drag": "ziehen",
+  "captureZone.snip": "ausschnitt",
 
   // Settings / API key setup
   "apiKey.loading": "Anbieter werden geladen…",

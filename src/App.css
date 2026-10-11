@@ -112,3 +112,31 @@ body {
 .tex-render ul { list-style: disc; }
 .tex-render ol { list-style: decimal; }
 .tex-render li { margin: 0.2em 0; }
+
+/* Motion & polish (design pass): subtle result fade-in + loading shimmer.
+   All disabled under prefers-reduced-motion. */
+@keyframes texnap-fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes texnap-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.result-in { animation: texnap-fadein 0.16s ease-out; }
+.banner-in { animation: texnap-fadein 0.16s ease-out; }
+.skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 37%,
+    var(--color-surface-2) 63%
+  );
+  background-size: 200% 100%;
+  animation: texnap-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .result-in,
+  .banner-in,
+  .skeleton { animation: none; }
+}

@@ -7,6 +7,7 @@ import { HintBar } from "./ui";
 import { useI18n, type Lang } from "../lib/i18n";
 import { providerCopy } from "../lib/i18n/providers";
 import { checkForUpdate, runUpdate, updateProgressLabel } from "../lib/updater";
+import { prettyShortcut, captureKeyGlyph } from "../lib/shortcut";
 
 type Props = {
   onDone: () => void;
@@ -36,24 +37,6 @@ function accelFromEvent(e: KeyboardEvent): { accel: string; label: string } | nu
     accel: [...mods, code].join("+"),
     label: [...mods.map((m) => SYMBOLS[m] ?? m), labelKey].join(" "),
   };
-}
-
-// Cold-load display of a stored (code-based) accelerator.
-function prettyShortcut(accel: string): string {
-  return accel
-    .split("+")
-    .map((part) => {
-      if (SYMBOLS[part]) return SYMBOLS[part];
-      if (/^Key[A-Z]$/.test(part)) return part.slice(3);
-      if (/^Digit[0-9]$/.test(part)) return part.slice(5);
-      const punct: Record<string, string> = {
-        Semicolon: ";", Comma: ",", Period: ".", Slash: "/", Quote: "'",
-        Backquote: "`", Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]",
-        Backslash: "\\",
-      };
-      return punct[part] ?? part;
-    })
-    .join(" ");
 }
 
 export function ApiKeySetup({ onDone, onCancel }: Props) {
@@ -88,15 +71,17 @@ export function ApiKeySetup({ onDone, onCancel }: Props) {
 
   useEffect(() => {
     void (async () => {
-      const [providerList, status, sc] = await Promise.all([
+      const [providerList, status, sc, glyph] = await Promise.all([
         invoke<ProviderInfo[]>("list_providers"),
         invoke<ConfigStatus>("get_config_status"),
         invoke<string>("get_shortcut"),
+        captureKeyGlyph(),
       ]);
       setProviders(providerList);
       setSavedProviders(status.savedProviders);
       setSelected(status.activeProvider);
-      setShortcutLabel(prettyShortcut(sc));
+      // Layout-aware: show ⌃⌘, on AZERTY where the physical M key is `,`.
+      setShortcutLabel(prettyShortcut(sc, glyph));
     })();
     void getVersion().then(setAppVersion).catch(() => {});
   }, []);

@@ -6,7 +6,16 @@ pub use texnap_core::{capture, ocr, provider};
 
 mod config;
 mod history;
+mod keyboard;
 mod snip;
+
+/// The character the physical capture key ("M" position) produces under the
+/// current keyboard layout — "M" on QWERTY, "," on AZERTY — so the UI can show
+/// the right default shortcut. `None` → the frontend falls back to the letter.
+#[tauri::command]
+fn capture_key_glyph() -> Option<String> {
+    keyboard::capture_key_glyph()
+}
 
 use std::str::FromStr;
 use tauri::{AppHandle, Emitter, Manager};
@@ -596,6 +605,7 @@ pub fn run() {
             config::get_shortcut,
             config::get_language,
             config::set_language,
+            capture_key_glyph,
             set_shortcut,
             history::get_history,
             history::add_history_entry,
