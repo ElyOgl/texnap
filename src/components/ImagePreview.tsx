@@ -8,7 +8,7 @@ import { TagEditor } from "./Tags";
 import { HintBar } from "./ui";
 import { WanderingEyes } from "./WanderingEyes";
 import { useI18n, type TKey } from "../lib/i18n";
-import type { ConfigStatus } from "../lib/providers";
+import type { ConfigStatus, ProviderInfo } from "../lib/providers";
 import "katex/dist/katex.min.css";
 
 type Props = {
@@ -34,10 +34,15 @@ type NameInfo = {
 type Transcription = {
   latex: string;
   providerLabel: string;
+  /** Stable id ("local", "gemini", …) — used to show the feedback widget only
+      for local-model results. */
+  providerId: string;
   fellBackFrom: string | null;
   /** Cloud-only: produced in the same request as the LaTeX (no extra call). */
   name: NameInfo | null;
 };
+
+type ProviderTarget = { id: string; label: string };
 
 type Verdict = {
   level: "match" | "minor" | "mismatch" | "unknown";
@@ -79,6 +84,18 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
   // if so, whether it can run now (a key, or the local model downloaded).
   const [explainSupported, setExplainSupported] = useState(true);
   const [explainReady, setExplainReady] = useState(false);
+  // Local-model feedback (F8): rate the on-device result, optionally say what's
+  // wrong and regenerate with another model; everything is logged as a dataset.
+  const [providerId, setProviderId] = useState<string | null>(null);
+  const [rating, setRating] = useState<"bad" | "mid" | "correct" | null>(null);
+  const [fbNote, setFbNote] = useState("");
+  const [fbOriginalLatex, setFbOriginalLatex] = useState("");
+  const [fbCorrectedVia, setFbCorrectedVia] = useState<string | null>(null);
+  const [fbCorrectedId, setFbCorrectedId] = useState<string | null>(null);
+  const [fbDone, setFbDone] = useState(false);
+  const [fbError, setFbError] = useState<string | null>(null);
+  const [regenBusy, setRegenBusy] = useState<string | null>(null);
+  const [regenTargets, setRegenTargets] = useState<ProviderTarget[]>([]);
   // Guards async name/explain results against a newer capture arriving meanwhile.
   const imageIdRef = useRef(image.id);
 
@@ -96,6 +113,14 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
     setExplanation(null);
     setExplaining(false);
     setExplainError(null);
+    setProviderId(null);
+    setRating(null);
+    setFbNote("");
+    setFbCorrectedVia(null);
+    setFbCorrectedId(null);
+    setFbDone(false);
+    setFbError(null);
+    setRegenBusy(null);
   }, [image.id]);
 
   // Editing the LaTeX invalidates a prior verdict.
@@ -154,6 +179,7 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
         lang,
       });
       setFellBackFrom(result.fellBackFrom);
+      setProviderId(result.providerId);
       // The name comes folded into the same response (no extra API call).
       if (imageIdRef.current === startedForImage) {
         setName(result.name && result.name.name.trim() ? result.name : null);
@@ -170,6 +196,97 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
       setLoading(false);
     }
   };
+
+  // When a local result is on screen, load the saved cloud providers to offer as
+  // "regenerate with" targets in the feedback widget.
+  useEffect(() => {
+    if (providerId !== "local") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [status, list] = await Promise.all([
+          invoke<ConfigStatus>("get_config_status"),
+          invoke<ProviderInfo[]>("list_providers"),
+        ]);
+        if (cancelled) return;
+        setRegenTargets(
+          status.savedProviders
+            .filter((id) => id !== "local")
+            .map((id) => ({ id, label: list.find((p) => p.id === id)?.label ?? id })),
+        );
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [providerId]);
+
+  const recordFeedback = async (
+    r: "bad" | "mid" | "correct",
+    opts?: { note?: string | null; correctedLatex?: string | null; correctedProvider?: string | null },
+  ) => {
+    try {
+      await invoke("record_feedback", {
+        feedback: {
+          id: crypto.randomUUID(),
+          imageDataUrl: image.dataUrl,
+          modelProvider: "local",
+          modelLatex: (r === "correct" ? latex : fbOriginalLatex || latex) ?? "",
+          rating: r,
+          comment: opts?.note ?? null,
+          correctedLatex: opts?.correctedLatex ?? null,
+          correctedProvider: opts?.correctedProvider ?? null,
+          lang,
+        },
+      });
+      setFbError(null);
+      setFbDone(true);
+    } catch (e) {
+      setFbError(t("feedback.error", { error: String(e) }));
+    }
+  };
+
+  const rate = (r: "bad" | "mid" | "correct") => {
+    if (r === "correct") {
+      setRating("correct");
+      void recordFeedback("correct");
+      return;
+    }
+    setRating(r);
+    setFbOriginalLatex(latex ?? ""); // snapshot the model's output before any regenerate
+  };
+
+  // Regenerate the current capture with a specific model (local retry or a saved
+  // cloud provider). The result replaces the editable LaTeX; providerId stays
+  // "local" so the feedback widget remains open to submit.
+  const regenerate = async (pid: string) => {
+    setRegenBusy(pid);
+    setFbError(null);
+    try {
+      const result = await invoke<Transcription>("ocr_transcribe_with", {
+        provider: pid,
+        imageDataUrl: image.dataUrl,
+        lang,
+      });
+      onLatexChange(result.latex);
+      setFbCorrectedVia(result.providerLabel);
+      setFbCorrectedId(result.providerId);
+      if (result.name && result.name.name.trim()) setName(result.name);
+    } catch (e) {
+      setFbError(String(e));
+    } finally {
+      setRegenBusy(null);
+    }
+  };
+
+  const submitFeedback = () =>
+    void recordFeedback(rating === "mid" ? "mid" : "bad", {
+      note: fbNote.trim() || null,
+      correctedLatex: fbCorrectedId ? latex : null,
+      correctedProvider: fbCorrectedId,
+    });
 
   // On-demand: reformulate the statement in plain language (selected UI language).
   const explain = async () => {
@@ -452,6 +569,93 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                     dangerouslySetInnerHTML={{ __html: renderLatex(explanation ?? "").html }}
                   />
                 )}
+              </div>
+            )}
+
+            {/* F8: local-model feedback — rate, optionally say what's wrong and
+                regenerate with another model. Logged as a labeled dataset. */}
+            {providerId === "local" && !fbDone && (
+              <div className="rounded-xl border border-line bg-surface-2 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-ink-3">{t("feedback.prompt")}</span>
+                  <div className="ml-auto flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => rate("bad")}
+                      className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${rating === "bad" ? "bg-red-500/20 text-red-300" : "border border-line-2 text-ink-2 hover:text-ink"}`}
+                    >
+                      {t("feedback.bad")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => rate("mid")}
+                      className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${rating === "mid" ? "bg-amber-500/20 text-amber-300" : "border border-line-2 text-ink-2 hover:text-ink"}`}
+                    >
+                      {t("feedback.mid")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => rate("correct")}
+                      className="rounded-md border border-line-2 px-2.5 py-1 text-[11px] text-ink-2 transition-colors hover:border-ok/50 hover:text-ok"
+                    >
+                      {t("feedback.correct")}
+                    </button>
+                  </div>
+                </div>
+
+                {(rating === "bad" || rating === "mid") && (
+                  <div className="mt-2.5 flex flex-col gap-2">
+                    <textarea
+                      value={fbNote}
+                      onChange={(e) => setFbNote(e.currentTarget.value)}
+                      placeholder={t("feedback.notePlaceholder")}
+                      rows={2}
+                      spellCheck={false}
+                      className="w-full resize-y rounded-lg border border-line bg-surface-3 px-3 py-2 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent/50"
+                    />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10.5px] text-ink-3">{t("feedback.regenerateWith")}</span>
+                      <button
+                        type="button"
+                        onClick={() => void regenerate("local")}
+                        disabled={!!regenBusy}
+                        className="rounded-full bg-surface-3 px-2.5 py-1 text-[11px] text-ink-2 transition-colors hover:text-ink disabled:opacity-50"
+                      >
+                        {regenBusy === "local" ? t("feedback.regenerating") : t("feedback.retryLocal")}
+                      </button>
+                      {regenTargets.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => void regenerate(p.id)}
+                          disabled={!!regenBusy}
+                          className="rounded-full bg-surface-3 px-2.5 py-1 text-[11px] text-ink-2 transition-colors hover:text-ink disabled:opacity-50"
+                        >
+                          {regenBusy === p.id ? t("feedback.regenerating") : p.label}
+                        </button>
+                      ))}
+                    </div>
+                    {fbCorrectedVia && (
+                      <span className="text-[10.5px] text-ok">{t("feedback.correctedBy", { provider: fbCorrectedVia })}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={submitFeedback}
+                      className="self-start rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
+                    >
+                      {t("feedback.submit")}
+                    </button>
+                  </div>
+                )}
+                {fbError && <p className="mt-1.5 text-[11px] text-red-400">{fbError}</p>}
+              </div>
+            )}
+            {fbDone && (
+              <div className="flex items-center gap-2 rounded-xl border border-ok/40 bg-surface-2 px-3 py-2 text-[11px] text-ok">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" />
+                </svg>
+                {t("feedback.thanks")}
               </div>
             )}
           </div>

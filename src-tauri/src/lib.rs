@@ -5,9 +5,23 @@
 pub use texnap_core::{capture, ocr, provider};
 
 mod config;
+mod feedback;
 mod history;
 mod keyboard;
 mod snip;
+
+/// Record one feedback entry on a local-model transcription (rating + optional
+/// note + optional corrected LaTeX) into the on-disk dataset.
+#[tauri::command]
+fn record_feedback(app: AppHandle, feedback: feedback::FeedbackPayload) -> Result<(), String> {
+    feedback::record(&app, feedback)
+}
+
+/// Number of feedback entries collected so far.
+#[tauri::command]
+fn feedback_count(app: AppHandle) -> usize {
+    feedback::count(&app)
+}
 
 /// The character the physical capture key ("M" position) produces under the
 /// current keyboard layout — "M" on QWERTY, "," on AZERTY — so the UI can show
@@ -313,6 +327,9 @@ struct Transcription {
     /// Which provider actually produced this — with five providers and
     /// fallback, the UI shows what answered.
     provider_label: &'static str,
+    /// Stable provider id ("local", "gemini", …) so the UI can reliably tell
+    /// a local-model result (for the feedback widget) without matching labels.
+    provider_id: &'static str,
     /// Set when the originally-active provider failed and a fallback answered,
     /// so the UI can say "X was unavailable — answered by <provider_label>".
     fell_back_from: Option<&'static str>,
@@ -345,6 +362,7 @@ async fn ocr_transcribe(
     lang: String,
 ) -> Result<Transcription, String> {
     let local_label = provider::Provider::Local.info().label;
+    let local_id = provider::Provider::Local.as_str();
     let local_ready = local_model_dir(&app)
         .map(|d| ocr::local_model_downloaded(&d))
         .unwrap_or(false);
@@ -353,7 +371,7 @@ async fn ocr_transcribe(
     // name: naming is cloud-only.
     if config::active_provider(&app) == provider::Provider::Local {
         let latex = transcribe_local_in_app(&app, &image_data_url).await?;
-        return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None, name: None });
+        return Ok(Transcription { latex, provider_label: local_label, provider_id: local_id, fell_back_from: None, name: None });
     }
 
     let chain = config::fallback_chain(&app);
@@ -361,7 +379,7 @@ async fn ocr_transcribe(
         // No cloud key configured — use the local model if it's downloaded.
         if local_ready {
             let latex = transcribe_local_in_app(&app, &image_data_url).await?;
-            return Ok(Transcription { latex, provider_label: local_label, fell_back_from: None, name: None });
+            return Ok(Transcription { latex, provider_label: local_label, provider_id: local_id, fell_back_from: None, name: None });
         }
         return Err(ocr::OcrError::MissingApiKey.to_string());
     }
@@ -374,6 +392,7 @@ async fn ocr_transcribe(
                 return Ok(Transcription {
                     latex,
                     provider_label: provider.info().label,
+                    provider_id: provider.as_str(),
                     // chain[0] is the originally-active provider; if we're past
                     // it, we fell back from there.
                     fell_back_from: (idx > 0).then(|| chain[0].0.info().label),
@@ -390,6 +409,7 @@ async fn ocr_transcribe(
                         return Ok(Transcription {
                             latex,
                             provider_label: local_label,
+                            provider_id: local_id,
                             fell_back_from: Some(chain[0].0.info().label),
                             name: None,
                         });
@@ -400,6 +420,45 @@ async fn ocr_transcribe(
         }
     }
     unreachable!("loop returns on the last provider")
+}
+
+// Regenerate with a SPECIFIC provider (the feedback "try another model" flow),
+// bypassing the active-provider/fallback logic. `local` runs on-device; any
+// other provider needs a saved key.
+#[tauri::command]
+async fn ocr_transcribe_with(
+    app: AppHandle,
+    provider: String,
+    image_data_url: String,
+    lang: String,
+) -> Result<Transcription, String> {
+    let p = provider::Provider::from_str(&provider)
+        .ok_or_else(|| format!("Unknown provider \"{provider}\""))?;
+    if p == provider::Provider::Local {
+        let latex = transcribe_local_in_app(&app, &image_data_url).await?;
+        return Ok(Transcription {
+            latex,
+            provider_label: provider::Provider::Local.info().label,
+            provider_id: provider::Provider::Local.as_str(),
+            fell_back_from: None,
+            name: None,
+        });
+    }
+    let key = config::fallback_chain(&app)
+        .into_iter()
+        .find(|(x, _)| *x == p)
+        .map(|(_, k)| k)
+        .ok_or_else(|| "No key saved for this provider — add one in Settings (⌘,).".to_string())?;
+    let (latex, name) = ocr::transcribe_and_name(p, &image_data_url, &key, &lang)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(Transcription {
+        latex,
+        provider_label: p.info().label,
+        provider_id: p.as_str(),
+        fell_back_from: None,
+        name: to_name_out(name),
+    })
 }
 
 #[derive(serde::Serialize)]
@@ -606,6 +665,9 @@ pub fn run() {
             config::get_language,
             config::set_language,
             capture_key_glyph,
+            record_feedback,
+            feedback_count,
+            ocr_transcribe_with,
             set_shortcut,
             history::get_history,
             history::add_history_entry,
