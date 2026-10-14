@@ -117,6 +117,7 @@ export const it: Record<TKey, Entry> = {
   "feedback.thanks": "Grazie — salvato per migliorare il modello",
   "feedback.regenerating": "Rigenerazione…",
   "feedback.correctedBy": "Corretto da {provider}",
+  "feedback.correctHint": "Rigenera con un modello cloud, o modifica il LaTeX sopra, per salvare una versione corretta — è ciò che allena il modello locale.",
   "feedback.error": "Impossibile salvare il feedback: {error}",
   // Offline explanation model (local provider, Settings)
   "apiKey.llm.title": "Spiegazioni offline (opzionale)",

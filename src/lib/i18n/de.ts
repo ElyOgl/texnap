@@ -117,6 +117,7 @@ export const de: Record<TKey, Entry> = {
   "feedback.thanks": "Danke — gespeichert, um das Modell zu verbessern",
   "feedback.regenerating": "Wird neu generiert…",
   "feedback.correctedBy": "Korrigiert von {provider}",
+  "feedback.correctHint": "Generiere mit einem Cloud-Modell neu oder bearbeite das LaTeX oben, um eine korrekte Version zu speichern — das trainiert das lokale Modell.",
   "feedback.error": "Feedback konnte nicht gespeichert werden: {error}",
   // Offline explanation model (local provider, Settings)
   "apiKey.llm.title": "Offline-Erklärungen (optional)",

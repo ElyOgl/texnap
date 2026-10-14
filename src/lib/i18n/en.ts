@@ -118,6 +118,7 @@ export const en = {
   "feedback.thanks": "Thanks — saved to improve the model",
   "feedback.regenerating": "Regenerating…",
   "feedback.correctedBy": "Corrected by {provider}",
+  "feedback.correctHint": "Regenerate with a cloud model, or edit the LaTeX above, to save a correct version — that's what trains the local model.",
   "feedback.error": "Couldn't save feedback: {error}",
   // Offline explanation model (local provider, Settings)
   "apiKey.llm.title": "Offline explanations (optional)",

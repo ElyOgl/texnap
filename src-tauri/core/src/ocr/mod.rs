@@ -270,10 +270,9 @@ fn explain_prompt(latex: &str, name: Option<&str>, lang: &str) -> String {
     format!(
         "You are explaining, in plain {lang}, the mathematical statement shown in the image (transcribed as LaTeX below) to a student who wants to truly understand it — not just read it back.\n\n\
 {name_line}{latex}\n\n\
-Write one flowing paragraph of about 5 to 7 sentences of natural {lang} prose that actually explains it, weaving together: what the objects and hypotheses are and the role each hypothesis plays; what the statement establishes or guarantees; the intuition or mechanism behind why it holds (or what it buys you); a concrete special case or simple example when it makes things clearer; and why it matters or where it is used. \
-Go beyond naming the symbols — give understanding. \
-You may use inline math symbols written between single dollar signs (e.g. $f$, $\\varepsilon$, $\\lim_{{n\\to\\infty}} u_n$) and bold a key term with \\textbf{{...}} when it genuinely helps readability. \
-Do not restate the whole thing as a formula, do not use display math, headings, bullet points, markdown fences, or any preamble like « This statement means ». Just the explanatory paragraph."
+Write one flowing paragraph of about 5 to 7 sentences of natural {lang} prose that actually explains it: what the objects and hypotheses are and the role each plays, what the statement establishes or guarantees, the intuition behind why it holds (or what it buys you), a concrete special case or simple example when it makes things clearer, and why it matters or where it is used. \
+Go beyond naming the symbols — give understanding.\n\n\
+Write ONLY plain running prose. Do NOT use LaTeX, dollar signs ($), backslash commands, Markdown, bold, headings, or bullet points — these render as broken text. When you need a symbol, write it in words or as a plain Unicode character (for example: ε, →, ∞, ≤, Σ, ln, \"the limit of u_n as n → ∞\"). No preamble like « This statement means »; just the explanatory paragraph."
     )
 }
 

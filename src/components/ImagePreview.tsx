@@ -281,12 +281,16 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
     }
   };
 
-  const submitFeedback = () =>
+  const submitFeedback = () => {
+    // A gold label is captured if the current LaTeX now differs from the model's
+    // original output — whether from a regenerate or a hand-edit above.
+    const corrected = latex && latex.trim() && latex !== fbOriginalLatex ? latex : null;
     void recordFeedback(rating === "mid" ? "mid" : "bad", {
       note: fbNote.trim() || null,
-      correctedLatex: fbCorrectedId ? latex : null,
-      correctedProvider: fbCorrectedId,
+      correctedLatex: corrected,
+      correctedProvider: corrected ? fbCorrectedId ?? "manual" : null,
     });
+  };
 
   // On-demand: reformulate the statement in plain language (selected UI language).
   const explain = async () => {
@@ -562,12 +566,10 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 {explainError ? (
                   <span className="text-red-400">{explainError}</span>
                 ) : (
-                  // Render through the same text-mode LaTeX→HTML converter as the
-                  // preview, so inline $…$ symbols and \textbf emphasis show.
-                  <div
-                    className="text-ink-2 [&_.katex]:text-ink"
-                    dangerouslySetInnerHTML={{ __html: renderLatex(explanation ?? "").html }}
-                  />
+                  // Plain prose: the explanation is "langage courant", so we show
+                  // it as text (React escapes it). Rendering it through KaTeX made
+                  // the model's stray $…$ collapse whole sentences into math.
+                  <p className="whitespace-pre-wrap text-ink-2">{explanation}</p>
                 )}
               </div>
             )}
@@ -635,8 +637,10 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                         </button>
                       ))}
                     </div>
-                    {fbCorrectedVia && (
+                    {fbCorrectedVia ? (
                       <span className="text-[10.5px] text-ok">{t("feedback.correctedBy", { provider: fbCorrectedVia })}</span>
+                    ) : (
+                      <span className="text-[10.5px] leading-snug text-ink-3">{t("feedback.correctHint")}</span>
                     )}
                     <button
                       type="button"
