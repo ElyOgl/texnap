@@ -476,18 +476,20 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
             {/* Action toolbar: Copy is the single primary; Check + Plain-language
                 are secondary. Rerun stays on ⏎ (see the hint bar). */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => void copy()}
-                className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="11" height="11" rx="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-                {t("preview.copy")}
-                <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘C</span>
-              </button>
+              {explainSupported && (
+                <button
+                  type="button"
+                  onClick={() => void explain()}
+                  disabled={explaining || !explainReady}
+                  title={explainReady ? t("explain.title") : t("explain.unavailable")}
+                  className="flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 transition hover:text-ink active:scale-[0.98] disabled:opacity-50"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {explaining ? t("explain.loading") : t("explain.button")}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void verify()}
@@ -500,20 +502,18 @@ export function ImagePreview({ session, canUndo, autoRun, onResult, onLatexChang
                 </svg>
                 {verifying ? t("preview.verifying") : t("preview.verify")}
               </button>
-              {explainSupported && (
-                <button
-                  type="button"
-                  onClick={() => void explain()}
-                  disabled={explaining || !explainReady}
-                  title={explainReady ? t("explain.title") : t("explain.unavailable")}
-                  className="ml-auto flex items-center gap-1.5 rounded-md border border-line-2 px-3 py-1.5 text-[12px] text-ink-2 transition hover:text-ink active:scale-[0.98] disabled:opacity-50"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {explaining ? t("explain.loading") : t("explain.button")}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => void copy()}
+                className="ml-auto flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="11" height="11" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                {t("preview.copy")}
+                <span className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px]">⌘C</span>
+              </button>
             </div>
 
             {/* Provenance + verdict — quiet, below the toolbar. */}
