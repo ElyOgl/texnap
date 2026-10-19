@@ -1,0 +1,65 @@
+name: Release
+
+# Build, sign, and publish a release when a version tag is pushed.
+# Usage: bump the version in package.json + tauri.conf.json + the 3 Cargo.toml,
+# commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`. This workflow
+# does the rest: tests → signed build → GitHub Release with the .dmg (first
+# install), the .app.tar.gz + .sig (in-app updater), and latest.json (the
+# updater endpoint). Existing users auto-update; no local build needed.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# tauri-action needs to create the release and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Apple Silicon runner → native aarch64 build, matching the local .dmg.
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Gate the release on the same checks we run locally. A failing tag does
+      # not publish.
+      - name: Frontend tests
+        run: npm test -- --run
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --workspace
+
+      - name: Build, sign, and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The minisign updater key (NOT Apple signing). Set as repo secrets.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "texnap ${{ github.ref_name }}"
+          releaseBody: "Installs via in-app auto-update from v0.7.0+, or download the .dmg below. Apple Silicon, unsigned (first install: see the README Gatekeeper step)."
+          releaseDraft: false
+          prerelease: false
+          # Generates and uploads latest.json, the updater endpoint served at
+          # releases/latest/download/latest.json.
+          includeUpdaterJson: true
